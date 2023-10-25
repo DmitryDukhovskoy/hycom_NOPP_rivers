@@ -1,0 +1,170 @@
+% Test code for the last step of remapping
+% 32 v layers from GLBb0.08 T07 experiment 19.0
+% onto 41 v layers ARCc0.07 T11
+% The first 3 steps 
+% (GLB-> ARC, ARC T07 ->T11 32layer, 
+%      ARC T11 32Lr -> relax ARCT11 41 layers, T& S) 
+% should be already done
+%
+% This code uses dummy archive (relax) files
+% with ARCc T11 41 layer archive files
+%
+% and interpolates U&V into 41 layers used in GOFS3.1
+%
+
+addpath /usr/people/ddmitry/codes/MyMatlab
+addpath /usr/people/ddmitry/codes/MyMatlab/seawater
+addpath /usr/people/ddmitry/codes/MyMatlab/hycom_utils;
+startup
+
+clear
+close all
+
+s_fig  = 0;
+f_plt_section = 0;  % plot averaged fields, along OBs
+esim   = '110';     % 41 -layer
+thbase = 34;        % sigma-2
+thref  = 1e-3;   % reference specific vol, m3/kg
+hg     = 1e24;  % "huge" in HYCOM used for land masking ONLY!
+huge   = hg;     % 0-depth values are not = huge
+rg     = 9806;
+Tv     = 11;
+gg     = 9.806;
+ssh2m  = 1/gg; % convert HYCOM srfhgt to ssh in m
+adj_btrop = 0;  % =0 - no btrop adjustmnt
+                  % >0 - adjust U,V Btrop to match mean Yuc. transport
+
+pthin  = '/Net/kronos/ddmitry/hycom/ARCc0.08/tmp_files/';
+pthrlx = '/Net/kronos/ddmitry/hycom/ARCc0.08/relax_41layers/output/';
+pthnest= '/Net/kronos/ddmitry/hycom/ARCc0.08/archv_41layers/';
+%pthglb  = '/Net/kronos/ddmitry/hycom/GLBb0.08/expt_69.1/restart/';
+pthtopo = '/Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.08/topo_grid/';
+
+ftopo = sprintf('%sdepth_ARCc0.08_%2.2i.nc',pthtopo,Tv); % 
+HH  = nc_varget(ftopo,'Bathymetry');
+LON = nc_varget(ftopo,'Longitude');
+LAT = nc_varget(ftopo,'Latitude');
+
+iyr=1993;
+
+
+
+% ===========================
+% Read in OLD 32-layer fields
+% ===========================
+% Dummy files
+hr=0;
+iday=1;
+
+% Read U,V from 32-layer files:
+finaOLD = sprintf('%sarchv_arcT%2.2i.%4.4i_%3.3i_%2.2i.a',pthin,Tv,iyr,iday,hr);
+finbOLD = sprintf('%sarchv_arcT%2.2i.%4.4i_%3.3i_%2.2i.b',pthin,Tv,iyr,iday,hr);
+
+[F,n,m,l] = read_hycom(finaOLD,finbOLD,'u_btrop');
+F(F>hg)=nan;
+Ub=squeeze(F);
+
+[F,n,m,l] = read_hycom(finaOLD,finbOLD,'v_btrop');
+F(F>hg)=nan;
+Vb=squeeze(F);
+
+% Check C-grid:
+% U and V in the nest/archv files
+% are on C-grid:
+%     -------------
+%     |           |
+%     |           |
+%     u    dP(i,j)  
+%     |           |
+%     |           |
+%     ----- v ------
+Jl=650;
+Il=find(HH(Jl,:)<0,1);
+ub=Ub(Jl,Il);
+vb=Vb(Jl,Il);
+vbm1=Vb(Jl,Il-1);
+if (ub==0 & vb~=0 & vbm1==0) | ...
+   (isnan(ub) & ~isnan(vb) & isnan(vbm1)) 
+   l_cgrd=logical(1);
+else
+  l_cgrd=logical(0);
+end
+
+[F,n,m,l] = read_hycom(finaOLD,finbOLD,'u-vel.');
+F(F>hg)=nan;
+U=F;
+
+[F,n,m,l] = read_hycom(fina,finb,'v-vel.');
+F(F>hg)=nan;
+V=F;
+
+[F,n,m,l] = read_hycom(fina,finb,'thknss');
+F(F>hg)=nan;
+F=F./rg;
+dP=F;
+
+U(dP==0)=nan;
+V(dP==0)=nan;
+
+% In the MEAN nest/archive files:
+% u_vel=u_btrop+u_bclinic i.e. u_total
+% In the intsant. archive/nest files:
+% u_vel=u_bclinic
+% Actually, It does not matter for this
+% method, as the method keeps the depth-integrated 
+% quantity (no matter U-bcl or U-total) unchanged
+ib=950;
+jb=300;
+ub=Ub(jb,ib);
+vb=Vb(jb,ib);
+ubc=squeeze(U(:,jb,ib));
+vbc=squeeze(V(:,jb,ib));
+dpc=squeeze(dP(:,jb,ib));
+ubc(isnan(ubc))=0;
+vbc(isnan(vbc))=0;
+u_dpav=ubc'*dpc/sum(dpc); 
+v_dpav=vbc'*dpc/sum(dpc);
+% depth-av. U
+% supposed to be <<1 & ~=Ubtrop, if U_btrop is subtracted
+if abs(1-abs(u_dpav/ub))>0.01
+  l_utotal=logical(0);
+else
+  l_utotal=logical(1);
+end
+
+% ===================
+% Read NEW 41 layers
+% ===================
+finaNEW = sprintf('%sarchv.rlx.ARCc0.08%2.2i_%4.4i_%3.3i.a',pthrlx,Tv,iyr,iday);
+finbNEW = sprintf('%sarchv.rlx.ARCc0.08%2.2i_%4.4i_%3.3i.b',pthrlx,Tv,iyr,iday);
+
+
+
+% Layers for new vertical grid where interpolate:
+[F,n,m,lout] = read_hycom(finaNEW,finbNEW,'thknss');
+F(F>hg)=nan;
+F=F./rg;
+dPnew=F;
+%dP(dP>=0.1*hg) = nan;  % Pressure, Pa
+
+
+% Interpolate into HYCOM hybrid-layers:
+[UU,VV]=sub_interp_UV2vlayers(U,V,dP,dPnew,HH);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

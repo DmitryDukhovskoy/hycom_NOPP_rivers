@@ -1,0 +1,93 @@
+% Create hycom_latlonmask_$TOPO.nc
+% for ESPC coupler
+addpath /usr/people/ddmitry/codes/MyMatlab
+addpath /usr/people/ddmitry/codes/MyMatlab/seawater
+addpath /usr/people/ddmitry/codes/MyMatlab/hycom_utils;
+startup
+
+clear all
+close
+
+
+TT = '11'; % topo name
+
+pthtmp  = '/Net/kronos/ddmitry/hycom/ARCc0.08/tmp_files/';
+pthtopo = '/Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.04/topo_grid/';
+pth8    = '/Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.08/topo_grid/'; 
+
+% Check land mask from Alan
+% compare with topo of ARCc0.08;
+f_exmp = 0; 
+if f_exmp>0
+		ftmp = sprintf('%shycom_latlonmask_11.nc',pthtmp);
+
+		lmsk = nc_varget(ftmp,'mask');
+
+		fltopo=sprintf('%sdepth_ARCc0.08_11.nc',pth8);
+		HH  = nc_varget(fltopo,'Bathymetry');
+		LAT = nc_varget(fltopo,'Latitude');
+		LON = nc_varget(fltopo,'Longitude');
+
+		lmsk08       = HH*0;
+		lmsk08(HH<0) = 1;
+
+		D=lmsk08-lmsk;
+
+end
+
+fltopo=sprintf('%sdepth_ARCc0.04_%s.nc',pthtopo,TT);
+% Get HYCOM topo and grid:
+HH  = nc_varget(fltopo,'Bathymetry');
+LAT = nc_varget(fltopo,'Latitude');
+LON = nc_varget(fltopo,'Longitude');
+[mm,nn]=size(HH);
+lmsk       = HH*0;
+lmsk(HH<0) = 1;
+
+
+% Output file:
+fnmB = sprintf('hycom_latlonmask_%s',TT);
+fnm  = sprintf('%s%s',pthtopo,fnmB);
+fcdl = [fnm,'.cdl'];
+
+fid = fopen(fcdl,'wt');
+fprintf(fid,'%s \n',sprintf('netcdf %s {',fnmB));
+fprintf(fid,'\n');
+fprintf(fid,'%s \n','dimensions:');
+fprintf(fid,'%s \n',sprintf('         X = %i ;',nn));
+fprintf(fid,'%s \n',sprintf('         Y = %i ;',mm));
+fprintf(fid,'\n');
+fprintf(fid,'%s \n','variables:');
+fprintf(fid,'%s \n','        float lat(Y,X) ;');
+fprintf(fid,'%s \n','        float lon(Y,X) ;');
+fprintf(fid,'%s \n','        float mask(Y,X) ;');
+fprintf(fid,'\n');
+% Variable attributes:
+fprintf(fid,'%s \n','    lat:standard_name = "latitude" ;');
+fprintf(fid,'%s \n','    lat:units = "degrees" ;');
+fprintf(fid,'%s \n','    lon:standard_name = "longitude" ;');
+fprintf(fid,'%s \n','    lon:units = "degrees" ;');
+fprintf(fid,'%s \n','    mask:standard_name = "land ocean mask" ;');
+fprintf(fid,'%s \n','    mask:units = "unitless" ;');
+fprintf(fid,'\n\n');
+fprintf(fid,'%s \n','//global attributes:');
+fprintf(fid,'%s \n','                :title = "HYCOM ARCc0.04 Topo 17DD" ;');
+fprintf(fid,'%s \n','                :history = "espc_lonlatmask" ;');
+fprintf(fid,'%s \n',sprintf('                :created = "%s" ;',date));
+fprintf(fid,'}');
+fclose(fid);
+
+stt=sprintf('system(''ncgen -b %s'')',fcdl);
+eval(stt);
+st2=sprintf('system(''mv %s.nc %s.'')',fnmB,pthtopo);
+eval(st2);
+
+fnc = [pthtopo,fnmB,'.nc'];
+fprintf('Writing netcdf %s\n',fnc);
+nc_varput(fnc,'mask',lmsk);
+nc_varput(fnc,'lat',LAT);
+nc_varput(fnc,'lon',LON);
+
+disp('DONE ');
+
+

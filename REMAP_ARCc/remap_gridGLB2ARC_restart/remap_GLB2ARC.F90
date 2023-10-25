@@ -1,0 +1,211 @@
+      PROGRAM REMAP_GLB_TO_ARC
+! Code remaps fields from HYCOM archive or restart file
+! saved on a GLBb tripolar grid onto Arctic grid ARCc
+!
+! U and V fields: In the ARCc - the half that is 
+! rotated from the GLBb grid (up from ARCc j= 1249)
+! all vectors (U and V components) need 
+! to be rotated by 180degrees
+! to match + direction in the ARCc grid
+!
+! access can be 'stream' then no record lenght is needed
+! HYCOM files are 'direct', then record length is needed
+! all records have to be same lengths
+! note that record length is platform-dependent
+! measure of the record
+!
+! Dmitry Dukhovskoy, COAPS FSU, April 2016
+! Jan 2017 - fixed bugs with rotating U,V in the upper half of ARCc domain
+!
+      USE all_variables
+      USE utils
+
+      IMPLICIT NONE
+
+      CHARACTER(60) :: fmat1
+      CHARACTER(8)  :: aa,aar*28
+      CHARACTER(80) :: str, smb*1
+      CHARACTER(80) :: str1, str2
+
+      INTEGER :: i,j,iG,jG, cnt, tstp
+      INTEGER :: npadg, npada, nrecIN, nrecOUT
+      INTEGER :: ich, jch, imm, k, &
+                 nrecl1, irec, nrecl2, irec2, &
+                 llist, lstr
+
+      REAL*4 :: mday, dens, amin, amax, bmin, bmax
+      REAL*4 :: amino, amaxo
+      REAL*4, allocatable :: FinT(:), fin1d(:), fin2d(:,:), &
+                             FoutT(:), fout1d(:), fout2d(:,:)
+
+
+      CALL READ_PARAM
+
+! Read remapping indices
+      CALL GET_REMAP_INDX
+
+!
+! HYCOM *.b format:
+      if (.not.irst) then
+        fmat1='(A8,1x,A1,2x,I9,1x,f10.3,1x,I2,1x,f6.3,2x,se14.7,2x,se14.7)'
+      else
+        fmat1='(A28,1x,A1,1x,I3,1x,I2,4x,se14.7,2x,se14.7)'
+      endif
+!
+! Define padding HYCOM file GLBb:
+      npadg = 4096-mod(IJDMG,4096)
+! Define size/padding for output file, ARCc:
+      npada = 4096-mod(IJDMA,4096)
+! Arrays for reading/writing full record with npad
+! for direct-access file
+      allocate(FinT(IJDMG+npadg),FoutT(IJDMA+npada))
+! Arrays with no padding 1D and 2D
+      allocate(fin1d(IJDMG),fin2d(IDMG,JDMG))
+      allocate(fout1d(IJDMA),fout2d(IDMA,JDMA))
+      inquire (iolength=nrecl1) FinT
+      inquire (iolength=nrecl2) FoutT
+
+      fin1d=0.
+      print*,'  '
+      print*,' GLBb: size 1 rec=',size(fin1d),' npad GLB=',npadg
+      print*,' ARCc: size 1 rec=',size(fout1d),' npad ARC=',npada
+      print*,' Record lengths, GLBb=',nrecl1,'  ARC=', nrecl2
+
+      open(11, file=trim(fina), action='read', &
+           form='unformatted', access='direct', &
+           recl=nrecl1, iostat=ios)
+      if (ios>0) then
+        print*,'ERROR openning HYCOM input *a'
+        STOP
+      endif
+      open(12, file=trim(finb), action='read', &
+               form='formatted', iostat=ios)
+      if (ios>0) then
+        print*,'ERROR openning HYCOM input *b'
+        STOP
+      endif
+
+      open(13, file=trim(fouta), action='write', &
+           form='unformatted', access='direct', &
+           recl=nrecl2, iostat=ios)
+      if (ios>0) then
+        print*,'ERROR openning output for writing *a'
+        STOP
+      endif
+      open(14, file=trim(foutb), action='write', &
+               form='formatted', iostat=ios)
+      if (ios>0) then
+        print*,'ERROR openning output for writing *b'
+        STOP
+      endif
+!
+! Read header from *.b and write it to the new file
+      print*,'Reading header: '
+      if (.not.irst) then
+        DO i=1,7
+          read(12,'(A)') str
+          if (i==4) &
+           str='depth_GLBb0.08_07; cbar = 0; GLBb remapped to ARCc'
+          write(14,'(A)') trim(str)
+          print*,'i=',i,'  ',trim(str)
+        ENDDO
+        read(12,'(I5,A)') ich,str1
+        print*,'I dimensions, input file ich=',ich
+        read(12,'(I5,A)') jch, str2
+        print*,'J dimensions, input file jch=',jch
+        write(14,'(I5,A)') IDMA,trim(str1)
+        write(14,'(I5,A)') JDMA,trim(str2)
+        read(12,'(A)') str
+        print*,str
+        write(14,'(A)') trim(str)
+      else
+        DO i=1,2
+          read(12,'(A)') str
+          write(14,'(A)') trim(str)
+        ENDDO
+      endif
+
+! Read output fields:
+      print*,trim(fmat1)
+      irec=0
+      irec2=0
+      cnt=0
+      DO
+        cnt=cnt+1
+        if (.not.irst) then
+          read(12,trim(fmat1),iostat=ios) &
+                  aa,smb,imm,mday,k,dens,bmin,bmax
+           print*,cnt,'*b: aa=',aa,' mday=',mday,' dens=',dens,&
+               ' bmin=',bmin,' bmax=',bmax
+        else
+          read(12,trim(fmat1),iostat=ios) &
+                  aar,smb,k,tstp,bmin,bmax
+          print*,cnt,'*b: ',aar,'layer=',k,'t.step=',tstp,&
+               ' bmin=',bmin,' bmax=',bmax
+        endif
+
+!        pause
+        if (ios<0) exit ! EOF
+        if (ios>0) STOP('*** ERR: READING ERROR UNIT=12')
+        if (trim(aa)=='') exit
+        irec=irec+1
+        read(11, rec=irec, iostat=ios) FinT
+!        read(11, iostat=ios) dmm
+        if (ios<0) STOP('READING HIT EOF UNIT=11 *.a')
+        if (ios>0) STOP('READING ERROR UNIT=11 *.a')
+        fin1d = FinT(1:IJDMG)
+        fin2d = reshape(fin1d,(/IDMG,JDMG/))
+
+        amin=minval(fin1d, mask = fin1d .lt. 1.e20)
+        amax=maxval(fin1d, mask = fin1d .lt. 1.e20)
+        print*,'Input *.a:',aa,' k=',k,'min=',amin,'max=',amax
+!        print*,'Check: Fin=',Fin(1800:1801)
+!        pause
+!
+!  Remap GLBb -> ARCc
+!  rotate U and V
+! transition occurs at j=1249
+! all i indices are the same (in columns) for j=1:1248
+! and then they switch  to another value for 1249:end
+! do not change land values 
+        DO i=1,IDMA
+        DO j=1,JDMA
+          iG=int(xmap(i,j))
+          jG=int(ymap(i,j))
+          fout2d(i,j)=fin2d(iG,jG)
+          if ( aa(2:5) .eq. '_btr' .or. &
+               aa(2:5) .eq. '-vel' ) then
+            if ( abs(iG-int(xmap(i,1)))>1 .and. &
+                fin2d(iG,jG)<1.e20) fout2d(i,j)=-fin2d(iG,jG)
+          endif
+        ENDDO
+        ENDDO
+
+! Write out
+        irec2  = irec2+1
+        fout1d = reshape(fout2d,(/IJDMA/))
+        FoutT(1:IJDMA)=fout1d
+        FoutT(IJDMA+1:IJDMA+npada)=2.**100
+        amino=minval(fout1d, mask = fout1d .lt. 1.e20)
+        amaxo=maxval(fout1d, mask = fout1d .lt. 1.e20)
+!        pause
+        if (.not.irst) then
+          print*,'Write ',aa,amino,amaxo
+          write(14,fmat1) aa,smb,imm,mday,k,dens,amino,amaxo
+        else
+          print*,'Write ',aar,amino,amaxo
+          write(14,fmat1) aar,smb,k,tstp,amino,amaxo
+        endif
+
+        write(13, rec=irec2) FoutT
+      ENDDO
+
+
+
+      close(11)
+      close(12)
+      close(13)
+      close(14)
+
+      STOP
+      END PROGRAM REMAP_GLB_TO_ARC

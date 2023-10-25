@@ -1,0 +1,11 @@
+This code remaps GLBb0.08 restart into
+ARCc0.08 grid 
+with same topo and v. layers
+
+If Topo and v. layers is different need to 
+run HYCOM in new configuration starting from rest
+dump a restart file
+use this restart as a template and run
+archv2restart_41lr_T11.com
+script that will modify existing archive file
+into a restart with new topo and v. grid.

@@ -1,0 +1,111 @@
+% GLBb0.08 19.0/19.1 reanalysis uses T07
+% My old experiments with Arctic regional HYCOM/CICE
+%   ARCc0.08 used T09
+% New ARCc (GOFS3.1) uses T11
+% ARCc T11 grid is from Alan's directory on newton:
+% /u/home/wallcraf/hycom/ARCb0.08/topo
+% drwxr-xr-x   2 wallcraf 0375G018    4096 Apr  1 20:52 ./
+%drwxr-xr-x   3 wallcraf 0375G018    4096 Apr  1 20:51 ../
+%-rw-r--r--   1 wallcraf 0375G018 16138240 Apr  1 20:51 depth_ARCb0.08_11.a
+%-rw-r--r--   1 wallcraf 0375G018     441 Apr  1 20:51 depth_ARCb0.08_11.b
+%-rw-r--r--   1 wallcraf 0375G018 258048000 Apr  1 20:51 regional.cice_11.r
+%
+% T11 has big mismatch with T07 at the Pacific OB - last row
+% In fact it should be closed (see ARCc T09)
+%
+% There is a very sharp H change at i=1200-1400
+% between j=2520 and j=2519
+%  and the mistmatch between T07 and T11 (land in T07 and ocean in T11)
+% this creates wrong density fields (due to interpolation of T and S into the bottom
+% grid cels that are the same values as in the last near-bottom cell)
+% and hybrid generator creates weird grid layers
+%
+% Modify ARCb -> ARCc
+% Create T11D: copy row 2519 to 2520, this will look like T07 row 2520
+% T11:         close off the last & first rows with "wall" 
+% ------------------------------------------
+% Compare topo difference in the relax zone
+% of ARCc 
+addpath /usr/people/ddmitry/codes/MyMatlab
+addpath /usr/people/ddmitry/codes/MyMatlab/seawater
+addpath /usr/people/ddmitry/codes/MyMatlab/hycom_utils;
+startup
+
+clear all
+close
+
+f_nc=1; % save also netCDF bath. file;
+RG='ARCc0.08'; % 
+hg=2^100;
+
+PTH.topo=sprintf('/Net/ocean/ddmitry/HYCOM/ARCc/%s/topo_grid/',RG);
+
+% Get ARC"b" T11:
+fltopo=sprintf('%sdepth_ARCb0.08_11.nc',PTH.topo);
+HH11  = nc_varget(fltopo,'Bathymetry');
+LAT11 = nc_varget(fltopo,'Latitude');
+LON11 = nc_varget(fltopo,'Longitude');
+[m,n] = size(HH11);
+%HH11(HH11>0)=nan;
+
+% Correct:
+%HH11(m,:)=HH11(m-1,:);
+HH11(m,:)=100;
+HH11(1,:)=100;
+
+% Write new topo to ARC"c"
+TV='11';
+fina=sprintf('%sdepth_%s_%s.a',PTH.topo,RG,TV);
+finb=sprintf('%sdepth_%s_%s.b',PTH.topo,RG,TV);
+fida=fopen(fina,'w','ieee-be');
+fidb=fopen(finb,'wt');
+fprintf('Writing new topo %s\n',fina);
+
+% Write 5-line header
+fprintf(fidb,'bathymtry from 30-scnd GEBCO_08 20091120 global data, 11x11 avrg, put walls in 1st and last rows\n');
+fprintf(fidb,'i/jdm = %i %i; plon,plat range = 74.12003 434.12000   -78.64000 89.97772\n',n,m);
+fprintf(fidb,'Filled single-width inlets and (B&C grid) enclosed seas except the Black Sea.\n');
+fprintf(fidb,'Clipped to range: 5.00 m to 11000.00 m. Compatible with CICE.\n');
+fprintf(fidb,'subregion of GLBb0.08-11; landmask all edges, Svalbard, Med. and Black Sea\n');
+fprintf(fidb,'min,max depth = %11.5f %11.5f\n',...
+	abs(max(max(HH11(HH11<0)))),abs(min(min(HH11))));
+
+fclose(fidb);
+HH11(isnan(HH11))=100;
+
+% Land -> huge #
+% all depths >0
+Ioc=find(HH11<0);
+Ilnd=find(HH11>=0);
+HH11=abs(HH11);
+HH11(Ilnd)=hg;
+
+IDM=n;
+JDM=m;
+IJDM=IDM*JDM;
+npad=4096-mod(IJDM,4096);
+toto=ones(npad,1);
+A=reshape(HH11',IJDM,1);
+fwrite(fida,A,'float32');
+fwrite(fida,toto,'float32');
+fclose(fida);
+
+fprintf('New bathymetr is done %s\n',fina);
+
+if f_nc==0, return; end;
+flda=fina;
+flga=sprintf('%sregional.grid_ARCc0.08.a',PTH.topo);
+flgb=sprintf('%sregional.grid_ARCc0.08.b',PTH.topo);
+pthout=PTH.topo;
+foutB=sprintf('depth_ARCc0.08_%s',TV);
+js=1;
+je=m;
+is=1;
+ie=n;
+ref1 = 'NRL SSC';
+ref2 = 'COAPS FSU D.Dukhovskoy';
+sub_convTOPO2nc(RG,TV,flda,flga,flgb,pthout,foutB,js,je,is,ie,ref1,ref2);
+
+
+
+

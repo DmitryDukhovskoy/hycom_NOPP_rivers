@@ -1,0 +1,146 @@
+      PROGRAM TOPO_GLB_TO_ARC
+! Code remaps Topography T07 from Global grid GLBb
+! onto Arctic grid ARCc
+!
+! access can be 'stream' then no record lenght is needed
+! HYCOM files are 'direct', then record length is needed
+! all records have to be same lengths
+! note that record length is platform-dependent
+! measure of the record
+!
+! Dmitry Dukhovskoy, COAPS FSU, April 2016
+!
+      USE all_variables
+      USE utils
+
+      IMPLICIT NONE
+
+      CHARACTER(60) :: fmat1
+      CHARACTER(8)  :: aa
+      CHARACTER(80) :: str, smb*1
+      CHARACTER(80) :: str1, str2
+
+      INTEGER :: i,j,iG,jG
+      INTEGER :: npadg, npada, nrecIN, nrecOUT
+      INTEGER :: ich, jch, imm, k, &
+                 nrecl1, irec, nrecl2, irec2, &
+                 llist, lstr
+
+      REAL*4 :: mday, dens, amin, amax, bmin, bmax
+      REAL*4 :: amino, amaxo
+      REAL*4, allocatable :: FinT(:), fin1d(:), fin2d(:,:), &
+                             FoutT(:), fout1d(:), fout2d(:,:)
+
+
+      CALL READ_PARAM
+
+! Read remapping indices
+      CALL GET_REMAP_INDX
+
+!
+! HYCOM *.b format:
+      fmat1='(A15,1x,f11.5,1x,f11.5)'
+!
+! Define padding HYCOM file GLBb:
+      npadg = 4096-mod(IJDMG,4096)
+! Define size/padding for output file, ARCc:
+      npada = 4096-mod(IJDMA,4096)
+! Arrays for reading/writing full record with npad
+! for direct-access file
+      allocate(FinT(IJDMG+npadg),FoutT(IJDMA+npada))
+! Arrays with no padding 1D and 2D
+      allocate(fin1d(IJDMG),fin2d(IDMG,JDMG))
+      allocate(fout1d(IJDMA),fout2d(IDMA,JDMA))
+      inquire (iolength=nrecl1) FinT
+      inquire (iolength=nrecl2) FoutT
+
+      fin1d=0.
+      print*,'  '
+      print*,' GLBb: size 1 rec=',size(fin1d),' npad GLB=',npadg
+      print*,' ARCc: size 1 rec=',size(fout1d),' npad ARC=',npada
+      print*,' Record lengths, GLBb=',nrecl1,'  ARC=', nrecl2
+
+      open(11, file=trim(fina), action='read', &
+           form='unformatted', access='direct', &
+           recl=nrecl1, iostat=ios)
+      if (ios>0) then
+        print*,'ERROR openning HYCOM input *a'
+        STOP
+      endif
+      open(12, file=trim(finb), action='read', &
+               form='formatted', iostat=ios)
+      if (ios>0) then
+        print*,'ERROR openning HYCOM input *b'
+        STOP
+      endif
+
+      open(13, file=trim(fouta), action='write', &
+           form='unformatted', access='direct', &
+           recl=nrecl2, iostat=ios)
+      if (ios>0) then
+        print*,'ERROR openning output for writing *a'
+        STOP
+      endif
+      open(14, file=trim(foutb), action='write', &
+               form='formatted', iostat=ios)
+      if (ios>0) then
+        print*,'ERROR openning output for writing *b'
+        STOP
+      endif
+!
+! Read header from *.b and write it to the new file
+      print*,'Reading header: '
+      DO i=1,5
+        read(12,'(A)') str
+        if (i==5) &
+!         str='Topogr mods to Faroe Bank Channel; ARCc from GLBb0.08-07'
+          str = ctitle
+        write(14,'(A)') trim(str)
+        print*,'i=',i,'  ',trim(str)
+      ENDDO
+
+      read(12,trim(fmat1)) str,bmin,bmax
+
+
+! Read output fields:
+      print*,trim(fmat1)
+      irec=1
+      read(11, rec=irec, iostat=ios) FinT
+!        read(11, iostat=ios) dmm
+      if (ios<0) STOP('READING HIT EOF UNIT=11 *.a')
+      if (ios>0) STOP('READING ERROR UNIT=11 *.a')
+      fin1d = FinT(1:IJDMG)
+      fin2d = reshape(fin1d,(/IDMG,JDMG/))
+
+      amin=minval(fin1d, mask = fin1d .lt. 1.e20)
+      amax=maxval(fin1d, mask = fin1d .lt. 1.e20)
+      print*,'Input topo, min=',amin,'max=',amax
+!
+!  Remap GLBb -> ARCc
+      DO i=1,IDMA
+      DO j=1,JDMA
+        iG=int(xmap(i,j))
+        jG=int(ymap(i,j))
+        fout2d(i,j)=fin2d(iG,jG)
+      ENDDO
+      ENDDO
+
+! Write out
+      irec2  = 1
+      fout1d = reshape(fout2d,(/IJDMA/))
+      FoutT(1:IJDMA)=fout1d
+      FoutT(IJDMA+1:IJDMA+npada)=2.**100
+      amino=minval(fout1d, mask = fout1d .lt. 1.e20)
+      amaxo=maxval(fout1d, mask = fout1d .lt. 1.e20)
+      print*,'Subregion topo  Min=',amino,' Max=',amaxo
+!        pause
+      write(14,fmat1) str,amino,amaxo
+      write(13, rec=irec2) FoutT
+
+      close(11)
+      close(12)
+      close(13)
+      close(14)
+
+      STOP
+      END PROGRAM TOPO_GLB_TO_ARC

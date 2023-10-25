@@ -1,0 +1,6 @@
+pthfin   = /Net/mars/ddmitry/hycom/ARCc0.04/nest_files/
+pthfout  = /Net/kronos/ddmitry/hycom/ARCc0.08/tmp_files/
+fnstin   = archv_arcT11L41.2007_001_00    
+fnstout  = archv_arcT11L41.2007_001tmp  
+IDM      = 1600
+JDM      = 2520

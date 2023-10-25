@@ -1,0 +1,21 @@
+fix errors in nest files: rotate U,V fields
+pthin:   input directory where error fields are
+pthout:  output directory for corrected nest fields
+fnmIN:   name of the input nest file
+fnmOUT:  output file with corrected fields
+pthgamp: path with remapping indices GLBb->ARCc
+fnmGMAP: remap indices file  
+IDM, JDM: horizontal grid  dim
+KDM:   vertical layers
+cheadr: max length 90 characters - info about data, *.b header
+===============================================================
+pthin      = /Net/kronos/ddmitry/hycom/ARCc0.08/archv_41layers/
+pthout     = /Net/kronos/ddmitry/hycom/ARCc0.08/archv_41layers/
+fnmIN      = archv_arcT11L41.1993_001_00_FORTerr
+fnmOUT     = archv_arcT11L41.1993_001_00_crct
+pathgmap   = /Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.08/topo_grid/          
+fnmGMAP    = regional.gmapi_GLBb0.08               
+IDM        = 1600
+JDM        = 2520
+KDM        = 41
+cheadr     = Daily nest from GLBb0.08 LR32 T07 interpolated -> ARCc0.08 L41 T11, corrected

@@ -1,0 +1,1 @@
+/nexsan/people/ddmitry/Net_ocean/HYCOM/ARCc/ARCc0.08/topo_grid/regional.grid.b

@@ -1,0 +1,22 @@
+expt     = 110
+RGNM     = ARCc0.08
+pthin    = /nexsan/archive/ARCc0.08_110/
+pthout   = /Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.08/110/data_BG_prt/
+pthTOPO  = /Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.08/topo/
+fnmTOPO  = depth_ARCc0.08_11D
+IDM      = 1600
+JDM      = 2520
+nlev     = 41 
+ntracers = 5
+yrS      = 1993
+nyrs     = 24
+repeat   = 0
+dTday    = 2.0  
+NPmax    = 50000
+NPlr     = 1000
+NuDiff   = 40.0
+lr1      = 1
+lr2      = 15
+RegSeed  = GrShelf
+
+

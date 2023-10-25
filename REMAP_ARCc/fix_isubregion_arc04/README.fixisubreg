@@ -1,0 +1,6 @@
+When interpolating ARCc0.8 ->ARCc0.04
+using isubregion, nan's appear in the 2 rows at the OB
+in ARCc0.04 (in U,V fields) due to nan's at ARCc0.08
+at the OB, to avoid this prepare a temporary 
+nest file with not nans at the OB rows/columns 
+where no land mask

@@ -1,0 +1,8 @@
+pthfin   = /Net/mars/ddmitry/hycom/ARCc0.04/nest_files/
+pthfout  = /Net/mars/ddmitry/hycom/ARCc0.04/nest_files/
+fnstin   = archv_arc04T17L41.2007_001_00    
+fnstout  = archv_arc04T17L41.2007_001fxd  
+pthTOPO  = /Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.04/topo/
+fnmTOPO  = depth_ARCc0.04_17DD
+IDM      = 3200
+JDM      = 5040

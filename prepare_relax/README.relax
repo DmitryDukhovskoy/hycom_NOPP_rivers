@@ -1,0 +1,59 @@
+Need to preapre relax files for new Topo T11 and 41 layers
+newton > ll | grep -v 'Green'
+total 36384768
+-rwxr-xr-x   1 ddukhovs 1085G122 516423680 Aug 24  2011 iso_sigma.a
+-rwxr-xr-x   1 ddukhovs 1085G122    1696 Aug 24  2011 iso_sigma.b
+-rwxr-xr-x   1 ddukhovs 1085G122 16138240 Aug 24  2011 nest_rmu.a
+-rwxr-xr-x   1 ddukhovs 1085G122     451 Aug 24  2011 nest_rmu.b
+-rwxr-xr-x   1 ddukhovs 1085G122 6197084160 Aug 24  2011 relax_int.a
+-rwxr-xr-x   1 ddukhovs 1085G122   30736 Aug 24  2011 relax_int.b
+-rwxr-xr-x   1 ddukhovs 1085G122 16138240 Aug 24  2011 relax_rmu.a
+-rwxr-xr-x   1 ddukhovs 1085G122     451 Aug 24  2011 relax_rmu.b
+-rwxr-xr-x   1 ddukhovs 1085G122 6197084160 Aug 24  2011 relax_sal.a
+-rwxr-xr-x   1 ddukhovs 1085G122   30736 Aug 24  2011 relax_sal.b
+-rwxr-xr-x   1 ddukhovs 1085G122 6197084160 Aug 24  2011 relax_tem.a
+-rwxr-xr-x   1 ddukhovs 1085G122   30736 Aug 24  2011 relax_tem.b
+-rwxr-xr-x   1 ddukhovs 1085G122 16138240 Aug 24  2011 tbaric.a
+-rwxr-xr-x   1 ddukhovs 1085G122     216 Aug 24  2011 tbaric.b
+-rwxr-xr-x   1 ddukhovs 1085G122 16138240 Aug 24  2011 thkdf4.a
+-rwxr-xr-x   1 ddukhovs 1085G122      36 Aug 24  2011 thkdf4.b
+-rwxr-xr-x   1 ddukhovs 1085G122 16138240 Aug 24  2011 veldf2.a
+-rwxr-xr-x   1 ddukhovs 1085G122      49 Aug 24  2011 veldf2.b
+-rwxr-xr-x   1 ddukhovs 1085G122 16138240 Aug 24  2011 veldf4.a
+-rwxr-xr-x   1 ddukhovs 1085G122      36 Aug 24  2011 veldf4.b
+
+All 32-layer fields are here:
+ddmitry@pegasus: /010> pwd
+/Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.08/relax/010
+
+
+
+
+relax_int.[ab]
+relax_tem.[ab]
+relax_sal.[ab]
+are prepared from PHC or GDEM climatology at:
+/home/ddmitry/codes/anls_mtlb_utils/hycom_NOPP_rivers/RELAX_PHC
+z_lveitus_sig2.com: puts z-leve into hycom horiz. grid (z-levels)
+relax_arc08.com: hycom z-level PHC -> hycom hybrid layers
+
+iso_sigma.[ab] - spatially vayring iopycnic layer target densities
+                 needed  for Baltic Sea, Mediterrenian and Black Seas
+                 in blkdat.input vsigma = 1 (true)
+                 for other regional models that do not include 
+                 these seas, vsigma=0 and do not need iso_sigma.[ab]
+                 Need to change v. layers, and match T11
+
+relax_rmu.[ab]
+nest_rmu.[ab] - relaxation or nesting, relax. weigths
+                within the buffer zone
+                The file has to match topo
+
+
+tbaric.[ab] - thermobaric reference state, run tbaric.com script
+              to create *.[ab] files, need to modify t.baric regions
+
+
+
+
+

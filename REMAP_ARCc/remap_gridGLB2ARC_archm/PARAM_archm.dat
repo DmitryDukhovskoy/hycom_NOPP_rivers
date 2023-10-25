@@ -1,0 +1,10 @@
+pathglb  = /Net/kronos/ddmitry/hycom/GOFS3.5/
+patharc  = /Net/kronos/ddmitry/hycom/GOFS3.5/
+fnmGLB   = 216_archm.2017_001_12
+fnmARC   = archv_GLBc2arc04.2017_001_12
+pathgmap = /Net/kronos/ddmitry/hycom/GOFS3.5/
+fnmGMAP  = regional.gmapi_GLBc0.04
+IDM_glob = 9000 
+JDM_glob = 7055
+IDM_arc  = 3200
+JDM_arc  = 5040

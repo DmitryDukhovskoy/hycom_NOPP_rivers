@@ -1,0 +1,160 @@
+% GLBb0.08 GOFS3.1 uses T11 topo
+% For my ARCc0.08, I modified T11 near the Pacific OB
+% 
+% 
+% ------------------------------------------
+% Compare topo difference in the relax zone
+% of ARCc 
+addpath /usr/people/ddmitry/codes/MyMatlab
+addpath /usr/people/ddmitry/codes/MyMatlab/seawater
+addpath /usr/people/ddmitry/codes/MyMatlab/hycom_utils;
+startup
+
+clear all
+close
+
+f_ABbin = 1; % = 0 - read topo fields from netCDF
+           % = 1 - read *.[ab] topo fields <- use this to see what HYCOM reads in
+
+PTH.topo='/Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.08/topo_grid/';
+%PTH.topo='/Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.72/topo_grid/';
+
+if f_ABbin==0;
+  fltopo=sprintf('%sdepth_ARCb0.08_11.nc',PTH.topo);
+  HH  = nc_varget(fltopo,'Bathymetry');
+  LAT = nc_varget(fltopo,'Latitude');
+  LON = nc_varget(fltopo,'Longitude');
+  [m,n]= size(HH);
+  [mm,nn]= size(HH);
+  HH(HH>0)=nan;
+
+  % Get T11:
+  TV='11';  %  Original T11D was corrected and closed,
+  fltopo=sprintf('%sdepth_ARCc0.08_%s.nc',PTH.topo,TV);
+  HH11  = nc_varget(fltopo,'Bathymetry');
+  LAT11 = nc_varget(fltopo,'Latitude');
+  LON11 = nc_varget(fltopo,'Longitude');
+  [m,n] = size(HH11);
+  HH11(HH11>0)=nan;
+else
+  fina = sprintf('%sdepth_ARCb0.08_11.a',PTH.topo); % arcB
+  finb = sprintf('%sdepth_ARCb0.08_11.b',PTH.topo);
+  fida = fopen(fina,'r');
+  flgrd = sprintf('%sregional.grid',PTH.topo);
+  
+  GRD = read_grid_bath(flgrd,fina);
+  HH = GRD.Topo;
+  I=find(HH>1e20);
+  HH=-HH;
+  HH(I)=100;
+  
+% Corrected topo:
+  fina = sprintf('%sdepth_ARCc0.08_11.a',PTH.topo); % T11D, arcC
+  GRD = read_grid_bath(flgrd,fina);
+  HH11 = GRD.Topo;
+  I=find(HH11>1e20);
+  HH11=-HH11;  % Correceted T11 (T11D)
+  HH11(I)=100;
+  
+end
+
+
+[mg,ng]=size(HH11);
+
+f_pltH = 0; % topo maps
+if f_pltH
+  figure(1); clf;
+  axes('Position',[0.05 0.08 0.4 0.84]);
+  pcolor(HH); shading flat;
+  hold on
+  contour(HH,[0 0],'k');
+  caxis([-1000 0]);
+  set(gca,'Color',[0.4 0.4 0.4]);
+  title('GLBb->ARCb T11');
+
+  axes('Position',[0.55 0.08 0.4 0.84]);
+  pcolor(HH11); shading flat;
+  hold on
+  contour(HH11,[0 0],'k');
+  caxis([-1000 0]);
+  set(gca,'Color',[0.4 0.4 0.4]);
+  title('T11D');
+
+
+  %txtbtm='/hycom_arc08/NOPP_rivers/compare_T07_T09.m';
+  txtbtm='compare_ARCc_T11vsT11D.m';
+  bottom_text(txtbtm,'pwd',1);
+end
+
+f_pltDH = 1; % plot difference H
+if f_pltDH
+  dH = HH11-HH;
+  figure(1); clf;
+  axes('Position',[0.09 0.1 0.86 0.82]);
+  pcolor(dH); shading flat;
+  caxis([-5000 0]);
+  set(gca,'Color',[0.4 0.4 0.4]);
+  title('Topo difference');
+  colorbar
+
+
+  %txtbtm='/hycom_arc08/NOPP_rivers/compare_T07_T09.m';
+  txtbtm='compare_ARCc_T09vsT11.m';
+  bottom_text(txtbtm,'pwd',1);
+  
+end  
+
+[mm,nn] = size(HH);
+
+% Plot section:
+sct='Pacif_ob2';
+switch(lower(sct))
+ case('we_carct');
+% Central Arctic:
+  jj1=1430;
+  jj2=jj1;
+  ii1=200;
+  ii2=1450;
+ case('atl_ob')
+% Atl. OB:
+  jj1=5;
+  jj2=jj1;
+  ii1=190;
+  ii2=1050;
+ case('pacif_ob');
+% Pacific OB:
+  jj1=2516;
+  jj2=jj1;
+  ii1=1;
+  ii2=nn;
+ case('pacif_ob2');
+% Pacific OB:
+  jj1=mm;
+  jj2=jj1;
+  ii1=1;
+  ii2=nn;
+end
+
+[mm,nn]=size(HH);
+
+h09=HH(mm-100:end,400);
+h11=HH11(mm-100:end,400);
+figure(2); clf;
+axes('Position',[0.08 0.56 0.9 0.48]);
+plot(h09,'b','linewidth',2);
+hold on;
+plot(h11,'r','linewidth',1.6);
+stt=sprintf('%s, HYCOM topo 09 (b) vs topo 11 (r)',sct);
+title(stt);
+
+axes('Position',[0.08 0.08 0.9 0.4]);
+plot(h09-h11);
+title('H difference');
+
+figure(3); clf;
+HH(isnan(HH))=100;
+HH11(isnan(HH11))=100;
+contour(HH,[0 0],'b');
+hold on;
+contour(HH11,[0 0],'r');
+

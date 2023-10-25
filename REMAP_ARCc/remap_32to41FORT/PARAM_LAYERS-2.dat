@@ -1,0 +1,32 @@
+pthtopo: directory of HYCOM ARCc topo, pthrlx: directory with
+pthin: input directory where file with old (32-layer) grid on T11
+pthout: output directory for interpolated 41-lr file T11
+pthblkdt: directory with 32 and 41-layer blkdat files
+pthtrlx: directory with 41-layer field template/example
+Lx_old & Lx_new - where isopycn. lrs start to match in old & new v. grids
+nvars - # of variables to be interpolated or changed (e.g., thknss)
+vars: 3D fields interpolated from 32->41 layers
+these vars have to be in *.b file and match order in *.b
+cheadr: max length 90 characters - info about data, *.b header
+pthtopo    = /Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.08/topo_grid/
+pthin      = /Net/kronos/ddmitry/hycom/ARCc0.08/tmp_files/
+pthout     = /Net/kronos/ddmitry/hycom/ARCc0.08/archv_41layers/
+pthblkdt   = /home/ddmitry/codes/anls_mtlb_utils/hycom_NOPP_rivers/
+pthtrlx    = /Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.08/relax/110/41layers_T11/
+fnmTOPO    = depth_ARCc0.08_11
+fnmIN      = archv_arcT11.2009_222_00
+fnmOUT     = archv_arcT11L41.2009_222_00_FORT
+fnmRLX     = relax.m01
+IDM        = 1600
+JDM        = 2520
+KDM        = 41
+KDMold     = 32
+Lx_old     = 14
+Lx_new     = 24
+nvars      = 5
+vars       = u-vel.
+vars       = v-vel.
+vars       = thknss
+vars       = temp
+vars       = salin
+cheadr     = Daily nest from GLBb0.08 32-layer T07 interpolated into ARCc0.08 41 layers T11

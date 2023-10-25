@@ -1,0 +1,495 @@
+% Plot tracer flux from Greenland
+% across specified contour -
+% Flux is normalized by the total Flux
+% so units are fracton of FWflux per length=uLng
+%
+% isobath around Greenland
+% see trFlux_contour_greenl.m
+%
+addpath /usr/people/ddmitry/codes/MyMatlab/;
+addpath /usr/people/ddmitry/codes/MyMatlab/seawater;
+addpath /usr/people/ddmitry/codes/MyMatlab/hycom_utils;
+addpath /usr/people/ddmitry/codes/MyMatlab/colormaps;
+addpath /usr/people/ddmitry/codes/anls_mtlb_utils/hycom_arc08;
+startup;
+
+close all
+clear
+
+YR1=2000;
+YR2=2016;
+uLng = 1000; % length of a segment for calculating flux, m
+
+s_fig = 0; % save figures eps
+f_map=0; % fluxes color-coded along contour, map, UV
+
+regn = 'ARCc0.08';
+expt = 110; % experiment without runoff
+%expt = 112;  % epxeriment with Greenland runoff and monthly Arctic rivers
+pthfig=sprintf('/Net/ocean/ddmitry/HYCOM/ARCc/%s/%3.3i/fig_green_xsct/',...
+		  regn,expt);
+pthtopo = '/Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.08/topo_grid/';
+pthmat  = '/Net/tholia/ddmitry/hycom/ARCc0.08/data_mat2/';
+pthfig='/Net/mars/ddmitry/hycom/ARCc0.08/110/fig_trac/';
+
+btx = 'plot_TrFlxNormzd_contour.m';
+
+ftopo = sprintf('%s/depth_%s_11.nc',pthtopo,regn); % 
+HH  = nc_varget(ftopo,'Bathymetry');
+LON = nc_varget(ftopo,'Longitude');
+LAT = nc_varget(ftopo,'Latitude');
+[mm,nn]=size(LON);
+[DX,DY]=sub_dx_dy(LON,LAT);
+
+%GC = sub_greenl_isobath(HH,LON,LAT); It seems that contour indices modified
+%Hs = GC.Hbottom; % bottom along section
+
+% ================================================
+% Plot Greenland map and the contour
+% ================================================
+f_pltgr=0;
+if f_pltgr==1
+  fn=10;
+  sub_plot_Greenl_contour(HH,LON,LAT,fn,GC);
+  bottom_text(btx,'pwd',1);
+end
+
+
+
+TflxD = []; % Tr flux whole depth along cntr
+Tflxz = []; % Tr flux upper 50m, cntr
+TfdW = [];  % Oct - March winter flux
+TfdS = [];  % Apr - Spt
+TfzW = [];  % Oct - March winter flux
+TfzS = [];  % Apr - Spt
+HF1D = [];
+cc = 0;
+ccw = 0;
+ccs = 0;
+for yr=YR1:YR2
+  fmat = sprintf('%s%3.3i_Greenl_TrFlx_%i.mat',...
+		   pthmat,expt,yr);
+
+  fprintf('Loading %s\n',fmat);
+  load(fmat);
+  
+  for im=1:12
+    cc = cc+1;
+    TM(cc) = FWFLX(im).TM;
+    ZZ = FWFLX(im).ZZ;
+    iz = find(ZZ<-50);
+    dmm = FWFLX(im).TrFlux_kg_s;
+    dall= nansum(dmm);
+    dmm(iz)=0;
+    dmz = nansum(dmm); 
+    
+    if ~exist('Hs','var')
+      Hs=FWFLX(1).Hbottom;
+    end
+   
+    TflxD = [TflxD;dall]; % Tr flux whole depth along cntr
+    Tflxz = [Tflxz;dmz];  % Tr flux upper 50m, cntr
+    
+    if im>=10 | im<=3
+      ccw=ccw+1;
+      TfdW=[TfdW;dall];
+      TfzW=[TfzW;dmz];
+    else
+      ccs=ccs+1;
+      TfdS=[TfdS;dall];
+      TfzS=[TfzS;dmz];
+    end
+    
+  end
+  
+end
+
+%A=B
+dst = FWFLX(1).DistCntr; % m
+xsct = dst*1e-3; % km
+dltX = diff(dst);
+dltX(end+1) = dltX(end);
+dltX0=dltX;
+Ir = find(dltX<100); % segment points repeated - bug in contour subroutine
+dltX(Ir) = nan;
+dX=nanmean(dltX);
+
+% Time-Mean Tr Flux, kg/s m
+aa=nanmean(TflxD)./dltX;
+aa(aa==0)=nan;
+ww=nanmean(TfdW)./dltX;
+ww(ww==0)=nan;
+ss=nanmean(TfdS)./dltX;
+ss(ss==0)=nan;
+fprintf('Mean tr flux, kg/s m        = %8.6f\n',nanmean(aa));
+fprintf('Winter Mean tr flux, kg/s m = %8.6f\n',nanmean(ww));
+fprintf('Summer Mean tr flux, kg/s m = %8.6f\n',nanmean(ss));
+
+% Overall time mean:
+mTfD = nanmean(TflxD); % whole depth intgr, time-averaged, 
+mTfz = nanmean(Tflxz); % intgr in upper 50 m, time-averaged, 
+Fall   = nansum(mTfD); % overall flux over whole contour & depth
+Fallz = nansum(mTfz); % overal flux in the upper 50 m
+I=find(mTfD<0);
+J=find(mTfD>0);
+Fneg = nansum(mTfD(I)); % negative flux
+Fpos = nansum(mTfD(J)); % positive flux
+% Convert all data to fraction of GrFW flux
+mTflxDn  = mTfD./abs(Fall); % fractions or normalized by total net flux
+mTflxDzn = mTfz./abs(Fallz); % fractions upper 50 m
+%keyboard
+
+% Seasonal:
+wTfD=nanmean(TfdW); % winter all depth
+wTfZ=nanmean(TfzW); % winter 50 m
+sTfD=nanmean(TfdS); % summer all depth
+sTfZ=nanmean(TfzS);
+
+
+
+% Plot Fluxes: whole depth
+% fraction of Gr FW flux 
+% Filter spatially along the contour
+% to get rid of highly oscillatory flux
+Wn = 1/40;
+[Bf,Af] = butter(9,Wn,'low');
+[Bfh,Afh] = butter(9,1/20,'low');
+
+% Filter whole depth time average fraction of total flux
+dmm    = mTflxDn; %
+yy     = filtfilt(Bf,Af,dmm); % 
+yy(find(Hs>=0))=nan;
+mTflxD = yy;
+
+dmm    = mTflxDzn; % 
+yy     = filtfilt(Bf,Af,dmm); % W/m
+yy(find(Hs>=0))=nan;
+mTflxz = yy;
+
+% Seasonal fluxes:
+% Winter
+dmm    = wTfD; %
+yy     = filtfilt(Bf,Af,dmm); % 
+yy(find(Hs>=0))=nan;
+wTfDf = yy;
+% 50 m
+dmm    = wTfZ; %
+yy     = filtfilt(Bf,Af,dmm); % 
+yy(find(Hs>=0))=nan;
+wTfZf = yy;
+
+% Summer
+dmm    = sTfD; %
+yy     = filtfilt(Bf,Af,dmm); % 
+yy(find(Hs>=0))=nan;
+sTfDf = yy;
+% 50m
+dmm    = sTfZ; %
+yy     = filtfilt(Bf,Af,dmm); % 
+yy(find(Hs>=0))=nan;
+sTfZf = yy;
+
+
+clear sTfZf sTfDf 
+clear wTfZf wTfDf 
+
+nrc=length(TM);
+ccs=0;
+ccw=0;
+for ik=1:nrc
+  dmm    = TflxD(ik,:); % 
+  fall   = nansum(dmm); % overall flux over whole contour & depth
+  dmm    = dmm./abs(fall); % fraction
+  yy     = filtfilt(Bf,Af,dmm); % 
+  yy(Hs>=0)=nan;
+  fTflxD(ik,:)=yy;
+
+% Seasonal  
+  dv=datevec(TM(ik));
+  imo=dv(2);
+  if imo>3 & imo<10
+    ccs=ccs+1;
+    sTfDf(ccs,:)=yy;
+  else
+    ccw=ccw+1;
+    wTfDf(ccw,:)=yy;
+  end
+
+  dmm    = Tflxz(ik,:); % kg/s -> kg/s per 1m
+%  fall   = nansum(dmm); % overall flux over whole contour & depth
+  dmm    = dmm./abs(fall); % fraction of the whole-depth net flux
+  yy     = filtfilt(Bf,Af,dmm); % W/m
+  yy(Hs>=0)=nan;
+  fTflxz(ik,:)=yy;
+  
+% Seasonal  
+  dv=datevec(TM(ik));
+  imo=dv(2);
+  if imo>3 & imo<10
+%    ccs=ccs+1;
+    sTfZf(ccs,:)=yy;
+  else
+%    ccw=ccw+1;
+    wTfZf(ccw,:)=yy;
+  end
+  
+
+end
+  
+  
+p10 = prctile(fTflxD,10,1);
+p10(isnan(p10))=0;
+yy  = filtfilt(Bfh,Afh,p10);
+p10 = yy;
+p10(Hs>=0)=nan;
+p90 = prctile(fTflxD,90,1);
+p90(isnan(p90))=0;
+yy  = filtfilt(Bfh,Afh,p90);
+p90 = yy;
+p90(Hs>=0)=nan;
+
+p10z = prctile(fTflxz,10,1);
+p10z(isnan(p10z))=0;
+yy  = filtfilt(Bfh,Afh,p10z);
+p10z = yy;
+p10z(Hs>=0)=nan;
+p90z = prctile(fTflxz,90,1);
+p90z(isnan(p90z))=0;
+yy  = filtfilt(Bfh,Afh,p90z);
+p90z = yy;
+p90z(Hs>=0)=nan;
+
+% --------------
+% Seasonal fluxes
+% Fraction of the overall flux
+% --------------
+% Whole depth, mean fluxes
+wTfDf_mn=nanmean(wTfDf);
+wTfZf_mn=nanmean(wTfZf);
+sTfDf_mn=nanmean(sTfDf);
+sTfZf_mn=nanmean(sTfZf);
+
+
+% Fraction of basin-shelf flux 
+% in Lab Sea SW Greenland Shelf - most of the outflow:
+iSW1=612;
+iSW2=1124;
+rF = nansum(mTflxD(iSW1:iSW2));
+fprintf(' ==== Fraction of GrFWFlux in SW Greenland section %4.2f%%\n',rF*100);
+
+% Fraction of basin-Shelf flux into the Subpolar Gyre (excl. Baffin + Nordic)
+iSb1=max(find(xsct<=2100));
+iSb2=max(find(xsct<=5500));
+rSbP = nansum(mTflxD(iSb1:iSb2));
+%rSbP = nansum(mTflxDn(iSb1:iSb2));
+rSbPz=nansum(mTflxDzn(iSb1:iSb2));
+
+% Plot cumulative GFWA flux integrated along the contour
+figure(10); clf;
+axes('Position',[0.08 0.45 0.9 0.45]);
+pTflxD=-mTflxD; % positive out of the domain
+pTflxD(isnan(pTflxD))=0;
+plot(xsct,cumsum(pTflxD),'k-','Linewidth',2);
+hold on;
+plot([xsct(iSb1) xsct(iSb1)],[0 1.5],'k--','Color',[0.6 0.6 0.6],'Linewidth',1.5);
+plot([xsct(iSb2) xsct(iSb2)],[0 1.5],'k--','Color',[0.6 0.6 0.6],'Linewidth',1.5);
+set(gca,'tickdir','out',...
+        'xlim',[0 xsct(end)],...
+	'xtick',[0:500:11000],...
+	'ytick',[-0.1:0.1:1.1],...
+	'ylim',[-0.05 1.1],...
+	'xgrid','on',...
+	'ygrid','on',...
+	'Fontsize',14);
+title('Fraction of mean GFWA shelf-basin flux integrated along the contour, + out');
+sl1=sprintf('Flx1=%4.3f',sum(pTflxD(1:iSb1)));
+sl2=sprintf('Flx2=%4.3f',sum(pTflxD(1:iSb2)));
+text(xsct(iSb1),-0.3,sl1);
+text(xsct(iSb2),-0.3,sl2);
+
+bottom_text(btx,'pwd',1,'Position',[0.05 0.2 0.4 0.05]);
+
+
+% Whole depth, mean fluxes
+yl1  = 1.02*min(p10);
+yl2  = 1.02*max(p90);
+yt1  = -30;
+yt2  = 10;
+dy   = 0.0005;
+fnmb = 1;
+sub_plot_flxsct1d(mTflxD, xsct,fnmb,yl1,yl2,yt1, yt2, dy);
+plot(xsct,wTfDf_mn,'Color',[0 0 1],'linewidth',1.6); % winter 
+plot(xsct,sTfDf_mn,'Color',[0 1 0],'linewidth',1.6); % summer
+plot(xsct,p10,'Color',[0.6 0.6 0.6],'linewidth',1.8);
+plot(xsct,p90,'Color',[0.6 0.6 0.6],'linewidth',1.8);
+stl = sprintf('%s-%i, Mean 10/90prct Fraction TrFlux/TotFlux Btm-Srf %i-%i',...
+	      regn,expt,YR1,YR2);
+
+title(stl);
+bottom_text(btx,'pwd',1,'position',[0.02 0.3 0.4 0.05]);
+set(gcf,'Position',[972 679 1276 633]);
+
+if s_fig==1
+  fgnm=sprintf('%sarc08_%3.3i_GrCntr_TrFluxFraction_WDpth.eps',pthfig,expt);
+  fprintf('Saving %s\n',fgnm);
+  print('-depsc2',fgnm);
+end
+
+
+% Plot Flux in the upper 50m:
+xsct = dst*1e-3; % km
+yl1  = 1.02*min(p10z);
+yl2  = 1.02*max(p90z);
+%yt1  = -15;
+%yt2  = 15;
+dy   = 2.5e-4;
+fnmb = 3;
+sub_plot_flxsct1d(mTflxz, xsct,fnmb,yl1,yl2,yt1, yt2, dy);
+plot(xsct,wTfZf_mn,'Color',[0 0 1],'linewidth',1.6); % winter 
+plot(xsct,sTfZf_mn,'Color',[0 1 0],'linewidth',1.6); % summer
+plot(xsct,p10z,'Color',[0.6 0.6 0.6],'linewidth',1.6);
+plot(xsct,p90z,'Color',[0.6 0.6 0.6],'linewidth',1.6);
+stl = sprintf('%s-%i, Mean 10/90prct TrFlux 50m, kg/s per 1m, %i-%i',...
+	      regn,expt,YR1,YR2);
+title(stl);
+bottom_text(btx,'pwd',1,'position',[0.02 0.3 0.4 0.05]);
+set(gcf,'Position',[972 679 1276 633]);
+
+if s_fig==1
+  fgnm=sprintf('%sarc08_%3.3i_GrCntr_TrFluxFraction_ZDpth.eps',pthfig,expt);
+  fprintf('Saving %s\n',fgnm);
+  print('-depsc2',fgnm);
+end
+
+
+% Map showing flux around Greenland:
+if f_map==1
+  fnmb=8;
+  cff = 10000;
+  %im  = 1;
+  fn  = im;
+  hf1 = mTflxD*cff;
+  xl1 = 450;
+  xl2 = 1050;
+  yl1 = 380;
+  yl2 = 1100;
+  c1  = -10;
+  c2  = 10;
+  stl = sprintf('%s-%3.3i,TrFlx WhDpth/AllFlx*%4.3d, %i-%i',regn,expt,cff,YR1,YR2);
+%  sub_plot_trflx_map(HH,LON,LAT,GC,hf1,...
+%		     fnmb,stl,xl1,xl2,yl1,yl2,c1,c2);
+  sub_plot_trflx_map(HH,LON,LAT,FWFLX,hf1,...
+		     fnmb,stl,xl1,xl2,yl1,yl2,c1,c2);
+  bottom_text(btx,'pwd',1);
+%  drawnow
+  
+end
+
+% --------------
+% Plot seasonal fluxes
+% Fraction of the overall flux
+% --------------
+% Whole depth, mean fluxes
+wTfDf_mn=nanmean(wTfDf);
+wTfZf_mn=nanmean(wTfZf);
+sTfDf_mn=nanmean(sTfDf);
+sTfZf_mn=nanmean(sTfZf);
+
+figure(4);
+hold on;
+plot(wTfDf_mn);
+plot(sTfDf_mn);
+plot(wTfZf_mn);
+plot(sTfZf_mn);
+
+legend('winter','summer','wnt50','smm50');
+
+anls_variab=1;
+
+if anls_variab==1
+  fprintf('Analysis of temporal variability\n');
+% Find strongest and weakest years of fluxes
+% across the SW Shelf
+% wind data are from
+% CCMP - hycom_NOPP_rivers/anls_atms/wind_ccmp_GrShelf_anls.m'
+% sWest tip 
+%  mTfD = nanmean(TflxD); % whole depth intgr, time-averaged, 
+%  mTfz = nanmean(Tflxz); % intgr in upper 50 m, time-averaged, 
+%  Fall   = nansum(mTfD); % overall flux over whole contour & depth
+  yrs=[YR1:YR2];
+
+  aa=Tflxz(:,iSW1:iSW2); % fraction of total flux
+  I=find(aa<0);
+  J=find(aa>0);
+  aa(I)=aa(I)/abs(Fneg);
+  aa(J)=aa(J)/abs(Fpos);
+  FswZ=nansum(aa,2);
+  mFZ=mean(reshape(FswZ,[12,17]),2); % monthly means
+
+  aa=TflxD(:,iSW1:iSW2); % fraction of total flux
+  aa(I)=aa(I)/abs(Fneg);
+  aa(J)=aa(J)/abs(Fpos);
+  FswD=nansum(aa,2);
+  mFD=mean(reshape(FswD,[12,17]),2);
+
+% Load winds:
+  foutp='/Net/tholia/ddmitry/ovwst/data_mat/wind_ccmp_rgn07_GrSh.mat';
+  load(foutp); % WND
+  V0=WND.V;
+  U0=WND.U;
+  U0=U0(:);
+  V0=V0(:);
+% Project on the Gr. coastline:
+% roughly 45 dgr:
+  tht=45*pi/180;  % will project on Y axis, -Vrotated means Northern Wind (upwelling fav).
+  RR=[cos(tht), -sin(tht); sin(tht), cos(tht)]; %<--- Double check this
+%        this is rotation of U vector, should be projection on 45-dgr 
+%	coastline ???????
+%	?????
+	
+  A=[U0,V0]*RR;
+  U=A(:,1);
+  V=A(:,2);
+
+  mV=mean(reshape(V,[12,17]),2);
+  mU=mean(reshape(U,[12,17]),2);
+  
+% Subtract seasonality:
+  nn=length(V);
+  clear dF* dU*
+  for ik=1:nn
+    mo=mod(ik,12);
+    if mo==0, mo=12; end;
+    dFz(ik)=FswZ(ik)-mFZ(mo);
+    dFd(ik)=FswD(ik)-mFD(mo);
+    dU(ik)=U(ik)-mU(mo);
+    dV(ik)=V(ik)-mV(mo);
+  end
+  
+  az=xcorr(dFz,dV,10,'coeff');
+  bz=xcorr(dFz,dU,10,'coeff');
+  ad=xcorr(dFd,dV,10,'coeff');
+  bd=xcorr(dFd,dU,10,'coeff');
+  
+
+% Create regression model
+% Flux = alf + btt*V (projected on the isobath/coast), such
+% that negative V projected is upwelling favorable wind
+% and should promote the outflow, i.e. + correlation
+% with the Tr outflow (negative as well)
+  dV=dV(:);
+  dU=dU(:);
+  SS=sqrt(dV.^2+dU.^2);
+  dFz=dFz(:);
+  dFd=dFd(:);
+%  dV1=dV(1:end-1);
+%  dV2=dV(2:end);
+  XX=[ones(nn,1),dV];
+  [b1,bint1,r1,rint1,st1]=regress(dFz,XX);
+  [b2,bint2,r2,rint2,st2]=regress(dFd,XX);
+
+end
+
+  
+  
+  

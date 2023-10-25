@@ -1,0 +1,10 @@
+pathglb  = /Net/kronos/ddmitry/hycom/GOFS3.5/               
+patharc  = /Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.04/topo/               
+fnmGLB   = depth_GLBc0.04_27
+fnmARC   = depth_ARCc0.04_GOFS3.5_27                          
+pathgmap = /Net/kronos/ddmitry/hycom/GOFS3.5/  
+fnmGMAP  = regional.gmapi_GLBc0.04               
+IDM_glob = 9000 
+JDM_glob = 7055
+IDM_arc  = 3200
+JDM_arc  = 5040

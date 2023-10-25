@@ -1,0 +1,158 @@
+% Plot time series of annual
+% tracer content converted 
+% to the FWCanomaly= Greenland FWFlux anomaly
+% accumulated in the Subpolar Gyre
+%
+% Tracer content calculated in vol_intgr_regn_trcr008.m
+%
+% Note: updated regions, now all regions
+% are adjacent to each other
+% So that Subpolar Gyre
+% combines reg #1 (Labr)+Reg#2(IcelSea)+Reg#7 (Centr NAtl)
+%
+addpath /usr/people/ddmitry/codes/MyMatlab/;
+addpath /usr/people/ddmitry/codes/MyMatlab/hycom_utils;
+addpath /usr/people/ddmitry/codes/MyMatlab/colormaps;
+addpath /usr/people/ddmitry/codes/anls_mtlb_utils/hycom_arc08;
+startup;
+
+close all
+clear
+
+regn = 'ARCc0.08';
+expt = 110;  
+
+s_mat = 0; % =0 - load saved time series of FWC anomaly
+nvl   = 41;  % # of v. layers in the model
+nTr   = 1;   % tracer to plot
+
+% Experiments:
+pthfig = sprintf('/Net/mars/ddmitry/hycom/%s/%3.3i/fig_trac/',regn,expt);
+pthtopo = '/Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.08/topo_grid/';
+pthmat  = sprintf('/Net/ocean/ddmitry/HYCOM/ARCc0.08/%3.3i/data_mat/',expt);
+
+
+%ftopo = sprintf('%s/depth_%s_17DD.nc',pthtopo,regn); % 
+ftopo = sprintf('%s/depth_%s_11.nc',pthtopo,regn); % 
+HH  = nc_varget(ftopo,'Bathymetry');
+LON = nc_varget(ftopo,'Longitude');
+LAT = nc_varget(ftopo,'Latitude');
+[mm,nn]=size(HH);
+[DX,DY]=sub_dx_dy(LON,LAT);
+Acell=DX.*DY; % Grid cell area, m2
+
+
+% Define Regions:
+%f_pltbox=0;
+%BX = sub_define_boxes(HH,LON,LAT,f_pltbox);
+%nbx = 6; % only N. Atl
+% create mask for each box
+%[XX,YY] = meshgrid((1:nn),(1:mm));
+%for ib=1:nbx
+%  iBG = BX(ib).IJ;
+%  INP = inpolygon(XX,YY,iBG(:,1),iBG(:,2));
+%  IN = find(INP==1 & HH<h0);
+%  BX(ib).IN = IN;
+%  fprintf(' Tracer integrated for region: %i %s\n',ib,BX(ib).Name);
+%end
+
+% Greenland FW F anomaly
+frv = sprintf('%sGreenland_cumFWFlux.mat',pthmat);
+fprintf('Loading %s\n',frv);
+load(frv); % annual cumulative Greenland FW anomaly cFWF
+
+
+fmatgr=sprintf('%strcr_sbpGr_fwc.mat',pthmat);
+if s_mat==1
+  rbx=0;
+  % Combine all years:
+  cc=0;
+  Vfw=0;
+  for iyr=1993:2016
+    yr   = iyr;
+    fmat = sprintf('%strcr%2.2i_regn_VrtLrMass_%i.mat',pthmat,nTr,iyr);
+    fprintf('Loading %s\n',fmat);
+    load(fmat);
+
+    if rbx==0
+      for ibx=1:length(VTRCR)
+	nm=VTRCR(ibx).Name;
+	if strncmp(nm,'Subpolar Gyre',13),
+	  rbx=ibx;
+	  break
+	end
+      end
+      if rbx==0
+	error('Subpolar Gyre is not found in VTRCR');
+      end
+    end
+
+    dzm=VTRCR(rbx).DZM;
+    mtrlr=VTRCR(rbx).TR;  % mass tracer in layers, in the box
+    mTRd=nansum(mtrlr,1); % integrated over the depth & Box, kg
+
+    ism = find(Ygr==iyr);
+    fwf0 = cFWF(ism); % km3
+
+  % Convert to the FWC anomaly  
+    vfwl_mo=zeros(41,12);
+    vfw_mo=0;
+    frc_mo=vfwl_mo;
+    for imo=1:12
+      fmatT = sprintf('%sMassTr%2.2i_lrs_%i%2.2i.mat',pthmat,nTr,iyr,imo);
+      fprintf('Loading %s\n',fmat);
+      load(fmatT);
+      ibtm=5; % over whole depth to bottom
+      Tr_dom=squeeze(TRCR(ibtm).MassTr_kg); % tracer integrated over whole water depth
+      MTr_dom = nansum(nansum(Tr_dom));
+      rr=mTRd(imo)/MTr_dom; 
+      rrl=mtrlr(:,imo)./MTr_dom; % by layers
+      vfw_mo(imo)=fwf0*rr; % km3 
+      vfwl_mo(:,imo)=fwf0*rrl; 
+%      frc_mo(:,imo)=rrl;
+    end
+  % Estimate volume of Greenland surplus FW in grid cell
+  % = ratio of FW tracer*total FWF (integrated over time 1990-date requested)
+    cc=cc+1;
+    MtrL(:,cc)=nanmean(mtrlr,2);  % mass Tracer, annual by layers
+    Vfw(cc) = mean(vfw_mo); % km3 Gr FWF anomaly integrated in time in the box
+    VfwL(:,cc)= mean(vfwl_mo,2); % km3 Gr FWF anomaly integrated in time in the box
+%    FrcL(:,cc)=mean(frc_mo,2);  % fraction of GrFW trcr by layers
+  end
+
+  fprintf('Saving %s\n', fmatgr);
+  save(fmatgr,'Vfw','VfwL','MtrL');
+else
+  fprintf('Loading %s\n', fmatgr);
+  load(fmatgr);
+  
+end
+
+% Plot FWC for constant runoff:
+Mup=sum(MtrL(1:25,:));
+Mtot=sum(MtrL,1);
+
+figure(1); clf;
+plot(Mup/max(Mup));
+hold on
+
+% analytical solution assuming constant FWFlux=F0
+dF0=280; % mean GFWF anom, km3/yr
+t=[0:24];
+k=1/5;
+V=dF0/k*(1-exp(-k*t));
+plot(V/max(V));
+
+
+x=[0:24];
+k=1/2;
+b=-6;
+y=dF0*exp(k*x+b)./(1+exp(k*x+b));
+plot(y);
+
+c0=exp(-12)/(k+2);
+V2=exp(-12)*exp(2*t)/(k+2)+exp(-k*t)*c0;
+
+
+
+

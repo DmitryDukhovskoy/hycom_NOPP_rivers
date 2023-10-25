@@ -1,0 +1,209 @@
+"""
+  Plot JRA-55 wind fields 
+"""
+from IPython import get_ipython
+get_ipython().magic('reset -sf')
+
+import os
+from netCDF4 import Dataset as NetCDFFile
+import numpy as np
+import matplotlib.pyplot as plt
+from copy import copy
+#import matplotlib as mtlb
+import matplotlib.colors as colors
+import matplotlib.mlab as mlab
+from matplotlib.colors import ListedColormap
+from mpl_toolkits.basemap import Basemap, shiftgrid
+from scipy.interpolate import griddata
+import importlib
+
+#import sys
+#sys.path.append('/usr/lib64/python3.8/site-packages/matplotlib/')
+
+
+plt.close('all')
+
+# assumed whole month data
+mo  = 7
+yr  = 2017
+dS  = 1
+dE  = 31
+dth = 6       # saved time step
+ 
+pthnc = '/nexsan/people/ddmitry/Net_ocean/JRA_55/'
+uflnm = 'usurf_{0}{1:02d}{2:02}00_{0}{1:02d}{3:2d}18.nc'.format(yr,mo,dS,dE)
+vflnm = 'vsurf_{0}{1:02d}{2:02}00_{0}{1:02d}{3:2d}18.nc'.format(yr,mo,dS,dE)
+
+ncu = NetCDFFile(pthnc+uflnm)
+ncv = NetCDFFile(pthnc+vflnm)
+
+#aa = np.random.randn(7,4)
+#aa[::-1] - flips array bottom to top
+# Read grid
+lonc = ncu.variables['g4_lon_2'][:].tolist()  # len(lonc) - size of the list
+latc = ncu.variables['g4_lat_1'][::-1]  # flip: S to North
+
+lonc.append(360.)
+lonc = np.array(lonc)
+
+nn = lonc.shape[0]
+mm = latc.shape[0]
+
+# Read U by hrs, flip S-N orientation and append extra column
+# to make continuous data
+
+ntime = np.int((dE-dS+1)*24/dth)
+Uav = np.zeros((mm,nn))
+Vav = np.zeros((mm,nn))
+
+for ii in range(ntime):
+  print("Reading record ",ii)
+  uu = np.zeros((mm,nn))
+  vv = np.zeros((mm,nn))
+  uin = ncu.variables['UGRD_GDS4_HTGL'][ii,::-1,:].squeeze()
+  vin = ncv.variables['VGRD_GDS4_HTGL'][ii,::-1,:].squeeze()
+  uu[:,:-1] = uin
+  uu[:,-1]  = uin[:,0]
+  vv[:,:-1] = vin
+  vv[:,-1]  = vin[:,0]
+
+  Uav += uu
+  Vav += vv
+
+del uin, vin
+
+Uav = Uav/np.float(ntime)
+Vav = Vav/np.float(ntime)
+Sav = np.sqrt(Uav**2+Vav**2)
+
+# create figure and axes instances
+plt.ion()  # enables interactive mode
+
+# Quick check:
+#plt.figure(1, figsize=(8,8))
+#plt.pcolormesh(lonc,latc,Sav, cmap='viridis')
+#plt.clim(0., 5.)
+
+# Colorbar
+#plt.colorbar(extend='min')
+#plt.colorbar(aspect=40)
+
+# Create 2D grid of lons/lats
+lon2d_in, lat2d_in = np.meshgrid(lonc, latc)
+
+# Create polar orthogonal grid
+m = Basemap(projection='npstere',boundinglat=60,lon_0=0,resolution='l')
+ny = Sav.shape[0]; nx = Sav.shape[1]
+#lon_new, lat_new = m.makegrid(nx, ny) # get lat/lons of ny by nx evenly spaced grid.
+#xnew, ynew = m(lon_new, lat_new) # compute map proj coordinates.
+
+# generate a grid that is equally spaced in a plot with the current pojection
+lon_new, lat_new, xnew, ynew = m.makegrid(100,100, returnxy=True)
+xh, yh = m(lon2d_in,lat2d_in)  # jra coordinates on the projections
+xnew = xnew.astype('float64')
+ynew = ynew.astype('float64')
+
+
+
+fig1 = plt.figure(1,figsize=(8,8))
+# draw parallels.
+parallels = np.arange(0.,90,10.)
+m.drawparallels(parallels,labels=[1,0,0,0],fontsize=10)
+# draw meridians
+meridians = np.arange(-360,360.,45.)
+m.drawmeridians(meridians,labels=[0,0,0,1],fontsize=10)
+
+plt.pcolormesh(xh,yh,Sav,shading='flat',cmap='viridis')
+m.fillcontinents(color=[0.8, 0.8, 0.8])
+plt.clim(0., 5.)
+
+
+# ============================================
+# Project the data onto the new grid
+points = np.column_stack((xh.flatten(),yh.flatten()))
+unew = griddata(points, Uav.flatten(), (xnew, ynew), method='linear')
+vnew = griddata(points, Vav.flatten(), (xnew, ynew), method='linear')
+ 
+#
+# Rotate U, V vectors to match N and E on the map projection
+import mod_utils_map
+importlib.reload(mod_utils_map)
+from mod_utils_map import rotate_vector_cart2polar
+lonPol = lon_new
+latPol = lat_new
+Ur, Vr = rotate_vector_cart2polar(unew,vnew, xnew, ynew, lonPol, latPol)
+
+I = np.argwhere(np.isnan(Ur))
+nnan = np.size(I)
+if not nnan:
+	print('Warning: rotated U,V have nans')
+
+# ====================================
+#
+
+
+# makegrid does not produce exactly evenly spaced grid
+# this causes error for steamplots
+# correct xnew, ynew
+import mod_utils_fig
+#importlib.reload(mod_utils_fig)  # to recompile changes when debugging the module
+from mod_utils_fig import correct_evensp_grid as crct_grid
+
+xnew, ynew = crct_grid(xnew,ynew)
+
+points = np.column_stack((xh.flatten(),yh.flatten()))
+unew = griddata(points, Uav.flatten(), (xnew, ynew), method='linear')
+vnew = griddata(points, Vav.flatten(), (xnew, ynew), method='linear')
+m.streamplot(xnew,ynew,unew,vnew,density=5)
+
+
+fig2 = plt.figure(figsize=(14,9))
+plt.clf()
+
+ax1 = fig2.add_subplot(2,1,1)
+ax2 = fig2.add_subplot(2,1,2)
+
+im1 = ax1.pcolormesh(lonc,latc,Sav, shading='flat', cmap='GnBu')
+im1.set_clim(0, 5.)
+dp=3
+Q = ax1.quiver(lon2d_in[::dp, ::dp],lat2d_in[::dp, ::dp],Uav[::dp, ::dp],Vav[::dp, ::dp], 
+               units='x', width=0.2, scale=0.4)
+ax1.axis('equal')
+ax1.set_xlim([0, 180])
+ax1.set_ylim([60, 90])
+
+im2 = ax2.pcolormesh(lonc,latc,Sav, shading='flat', cmap='GnBu')
+im2.set_clim(0, 5.0)
+Q = ax2.quiver(lon2d_in[::dp, ::dp],lat2d_in[::dp, ::dp],Uav[::dp, ::dp],Vav[::dp, ::dp],    
+               units='x', width=0.2, scale=0.4)
+ax2.axis('equal')
+ax2.set_xlim([180, 360])
+ax2.set_ylim([60, 90])
+
+
+# Plot wind vectors on projection grid
+# Shift grid to [-180, 180] for better interpolation
+ugrid, newlons = shiftgrid(180.,unew,lon_new,start=False)
+vgrid, newlons = shiftgrid(180.,vnew,lon_new,start=False)
+
+# Transform vectors to projection grid:
+#Uproj, Vproj, xx, yy = \
+#m.transform_vector(ugrid,vgrid,newlons,latc,nx,ny,returnxy=True,masked=True)
+Uproj,Vproj,xx,yy = \
+m.transform_vector(Uav,Vav,lonc,latc,nx,ny,returnxy=True,masked=False)
+
+# now plot.
+Q = m.quiver(xx,yy,Uproj,Vproj,scale=200)
+# make quiver key.
+qk = plt.quiverkey(Q, 0.1, 0.1, 20, '20 m/s', labelpos='W')
+
+
+plt.colorbar(aspect=50)
+
+
+
+
+
+
+
+

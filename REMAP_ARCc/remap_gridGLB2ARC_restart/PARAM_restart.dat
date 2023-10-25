@@ -1,0 +1,10 @@
+pathglb  = /Net/kronos/ddmitry/hycom/GLBb0.08/expt_69.1/restart/ 
+patharc  = /Net/kronos/ddmitry/hycom/ARCc0.08/tmp_files/                  
+fnmGLB   = restart_108a    
+fnmARC   = restart_GLB2ARC_T11_41lr_108a                          
+pathgmap = /Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.08/topo_grid/          
+fnmGMAP  = regional.gmapi_GLBb0.08               
+IDM_glob = 4500 
+JDM_glob = 3298
+IDM_arc  = 1600
+JDM_arc  = 2520

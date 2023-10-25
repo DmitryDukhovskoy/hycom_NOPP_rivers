@@ -1,0 +1,10 @@
+pathglb  = /nexsan/GLBb0.08/GLBb0.08_191/data/meanstd/
+patharc  = /Net/mars/ddmitry/hycom/GLBb2ARCc0.08/mnth_mean/                  
+fnmGLB   = 191_archMN.1996_12
+fnmARC   = 191_archMN_GLBb2ARCc.1996_12
+pathgmap = /Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.08/topo_grid/          
+fnmGMAP  = regional.gmapi_GLBb0.08               
+IDM_glob = 4500 
+JDM_glob = 3298
+IDM_arc  = 1600
+JDM_arc  = 2520

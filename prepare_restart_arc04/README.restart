@@ -1,0 +1,20 @@
+HYCOM restart files for ARCc0.04
+are prepared from ARCc0.08 experiments
+with 5 passive tracers
+The strategy is
+1) restart 0.08 -> archive archv0.08
+     use script restart2archv.csh
+2) archv 0.08 -> archv 0.04 (interpolate using isubregion)
+3) archv 0.04 -> restart 0.04
+All these steps use Wallcraft's codes, however tracers 
+are not added to the restart files in theses codes
+See scripts on gordon:
+ gordon02-ddukhovs [1025] : pwd
+/p/home/ddukhovs/hycom/ARCc0.04/prepare_restartARCc0.04
+
+Tracers need to be added afterwards
+
+The following steps are done in tracers2restart.F90:
+4) Interpolate tracers into 0.04 (interp.F90)
+5) Add to restart 0.04 
+

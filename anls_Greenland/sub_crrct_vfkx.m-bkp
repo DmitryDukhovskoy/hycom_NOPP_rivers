@@ -1,0 +1,190 @@
+function Vct = sub_crrct_vflx(GC,U,V,dH,DX,DY,HH);
+% Volume flux is not conserved
+% in HYCOM mean files
+% calculate net vol flux correction 
+% (+Vct*dh*dz - correction for flux in 1 grid cell) 
+% across the contour
+% assuming it should be ~0
+% disbalance distribute over
+% all grid points
+%
+%dH(isnan(dH))=0;
+Hs = GC.Hbottom;
+[nlr,mm,nn] = size(U);
+II = GC.cntr_Iindx;
+JJ = GC.cntr_Jindx;
+np = length(II);
+ZZ = zeros(nlr,np);
+Vflx = zeros(1,np)*nan; % volume flux for checking
+Asgm = zeros(1,np);
+Vct = 0; 
+
+cc = 0;
+VF=1e9;
+VF0 = VF;
+add = 1e-8;
+while abs(VF)>1e-1 | VF<0;
+%Asgm2 = zeros(1,np);
+  cc=cc+1;
+  if cc>50, error('Endless loop, VF =%8.6f\n',VF); end
+
+  clear Vflx
+  
+  for ig=1:np-1
+    i1=II(ig);
+    i2=II(ig+1);
+    j1=JJ(ig);
+    j2=JJ(ig+1);
+
+    clear vflx u12 u34 v12 v34 
+      
+    if Hs(ig)>=0 & Hs(ig+1)>=0, 
+      continue; 
+    end;
+
+    xsct = 1;
+    if i2==i1 % y section
+      xsct = 0;
+    end
+  % Reorder i1/j1 and i2/j2 so that i2>i1 or j1>j2
+    if i2<i1, 
+      imm=i2;
+      i2=i1;
+      i1=imm;
+    end
+    if j2<j1
+      jmm=j2;
+      j2=j1;
+      j1=jmm;
+    end
+
+    nrm = GC.Norm_in(ig,:);
+    nx  = nrm(1);
+    ny  = nrm(2);
+%    fprintf('ig=%i\n',ig);
+%    fprintf('Hs=%6.1f, nx=%i, ny=%i, j1=%i, i1=%i\n',Hs(ig),nx,ny,j1,i1);
+%    fprintf('HH=%6.2f, HH=%6.2f\n',HH(j1,i1),HH(j2,i2));
+%    fprintf('j1,i1: U=%6.3f, V=%6.3f\n',U(1,j1,i1),V(1,j1,i1));
+%    fprintf('j2,i2: U=%6.3f, V=%6.3f\n',U(1,j2,i2),V(1,j2,i2));
+    dZ = 0;
+    clear vf*
+  % collocate dH, U, V
+    if xsct==0 % i2=i1
+      if nx==0, error('Check norm x comp., it is 0!'); end;
+      u1 = squeeze(U(:,j1,i1))*nx;
+      dh1= 0.5*squeeze(dH(:,j1,i1-1)+dH(:,j1,i1));
+      u1(dh1<1e-3)=nan;
+      u1  = sub_chck_uv(u1,dh1,0);
+
+      u2 = squeeze(U(:,j1,i1+1))*nx;
+      dh2= 0.5*squeeze(dH(:,j1,i1)+dH(:,j1,i1+1));
+      u2(dh2<1e-3) = nan;
+      u2  = sub_chck_uv(u2,dh2,0);	
+% Values in the center of the grid cell	
+      u12  = (u1.*dh1+u2.*dh2)./(dh1+dh2);
+      u12  = u12+Vct;
+      dh12 = squeeze(dH(:,j1,i1));
+      dy12 = DY(j1,i1);
+      vf12 = u12.*dh12.*dy12;                    % m3/s - volume flux
+      
+% U Fluxes in grid cell (j2,i2):	
+      u3  = squeeze(U(:,j2,i2))*nx;
+      dh3 = 0.5*squeeze(dH(:,j2,i2-1)+dH(:,j2,i2));
+      u3(dh3<1e-3) = nan;
+      u3  = sub_chck_uv(u3,dh3,0);
+
+      u4  = squeeze(U(:,j2,i2+1))*nx;
+      dh4 = 0.5*squeeze(dH(:,j2,i2)+dH(:,j2,i2+1));
+      u4  = sub_chck_uv(u4,dh4,0);
+
+% Values in the center of the grid cell	
+      u34  = (u3.*dh3+u4.*dh4)./(dh3+dh4);
+      u34  = u34+Vct;
+      dh34 = squeeze(dH(:,j2,i2));
+      dy34 = DY(j2,i2);
+      vf34 = u34.*dh34.*dy34;                    % m3/s - volume flux
+      vf34 = vf34+Vct;
+      
+      dZ   = 0.5*squeeze(dH(:,j1,i1)+dH(:,j2,i2));
+      vflx = 0.5*(vf12+vf34);
+      Asgm(ig) = nansum(dZ)*0.5*(dy12+dy34);
+
+    else  % xsection
+      if ny==0, error('Check norm y comp., it is 0!'); end;
+      v1  = squeeze(V(:,j1,i1))*ny;
+      dh1 = 0.5*(squeeze(dH(:,j1-1,i1)+dH(:,j1,i1)));
+      v1(dh1<1e-3) = nan;
+      v1  = sub_chck_uv(v1,dh1,0);	
+
+      v2  = squeeze(V(:,j1+1,i1))*ny;
+      dh2 = 0.5*(squeeze(dH(:,j1,i1)+dH(:,j1+1,i1)));
+      v2(dh2<1e-3) = nan;
+      v2  = sub_chck_uv(v2,dh2,0);	
+
+% Values in the center of the grid cell	
+      v12   = (v1.*dh1+v2.*dh2)./(dh1+dh2);
+      v12   = v12+Vct;
+      dh12  = squeeze(dH(:,j1,i1));	
+      dx12  = DX(j1,i1);
+      vf12  = v12.*dh12.*dx12;                    % m3/s - volume flux
+      
+      v3  = squeeze(V(:,j2,i2))*ny;
+      dh3 = 0.5*(squeeze(dH(:,j2,i2)+dH(:,j2-1,i2)));
+      v3(dh3<1e-3) = nan;
+      v3  = sub_chck_uv(v3,dh3,0);	
+
+      v4  = squeeze(V(:,j2+1,i2))*ny;
+      dh4 = 0.5*(squeeze(dH(:,j2,i2)+dH(:,j2+1,i2)));
+      v4(dh4<1e-3) = nan;
+      v4  = sub_chck_uv(v4,dh4,0);	
+
+% Values in the center of the grid cell	
+      v34 = (v3.*dh3+v4.*dh4)./(dh3+dh4);
+      v34 = v34+Vct;
+      dh34= squeeze(dH(:,j2,i2));	
+      dx34 = DX(j2+1,i2);
+      vf34 = v34.*dh34.*dx34;                    % m3/s - volume flux
+      
+      dZ   = 0.5*squeeze(dH(:,j1,i1)+dH(:,j2,i2));
+      vflx = 0.5*(vf12+vf34);
+      Asgm(ig) = abs(nansum(dZ)*0.5*(dx12+dx34));
+  %    Asgm(ig) = 0.25*(abs(nansum(dh1*dx1+dh2*dx2+dh3*dx3+dh4*dx4)));
+
+    end
+
+  %  ZZ(ig)  = sum(dZ);
+    if ig==1000,
+%      fprintf('nx=%i, ny=%i\n',nx,ny);
+      fprintf('v12=%10.8d\n',v12);
+      fprintf('vf12=%10.8f, vf34=%10.8f, vflx=%10.8d, VF=%10.8d\n',...
+	      vf12(1),vf34(1),nansum(vflx),nansum(nansum(Vflx)));
+%      keyboard
+    end
+    
+    Vflx(ig) = nansum(vflx); % depth-integrated vol flux, m3/s
+
+  %  if (ig==1000); keyboard; end;
+  end  % ig - segment
+
+  VF   = nansum(Vflx);
+  %Asct = nansum(Asgm); % lateral surface area, m2
+  Asct = nansum(Asgm); % lateral surface area, m2
+
+  % Correction of u (m/s) or flux per 1 m2 of area
+  if sign(VF)~=sign(VF0), 
+    add=add*0.5;
+  end
+  VF0=VF;
+  
+  Vct = Vct-VF/Asct-sign(VF)*add;
+  
+  fprintf('cc=%i, VF=%10.8d Vct=%10.8d\n\n',cc,VF, Vct);
+
+end
+
+
+%keyboard
+%v12=1.12186749e-01
+%vf12=533.86613576, vf34=489.98154984, vflx=3.17296393e+05, VF=6.78946018e+04
+%cc=15, VF=3.11165911e-02 Vct=3.35958640e-03
+return

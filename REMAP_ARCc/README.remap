@@ -1,0 +1,109 @@
+To remap GLOBAL fields Topography 7 
+(GLBb0.08 experiment 19.0) to ARCc0.08 Topography 11:
+1) remap GLBb0.08-> ARCc0.08 T07:
+goto remap_gridGLB2ARC_archv
+make sure that the updated version of the code is used
+where U,V fields for j grid > 1249 are rotated 
+so that they are opposite to the U,V in GLBb 
+change PARAM.dat
+run executable
+
+for mean archive files (*archm*) use codes in remap_gridGLB2ARC_archm
+note that nesting can be archv or archm, the difference is in the u-vel, v-vel
+in the archm fields u-vel=total velocity (barocl+barotropic) in the
+archv u-vel, v-vel - baroclinic components only
+To distinguish the two nest files, HYCOM is looking for
+"kemix" and "kebtrop" in *.b file for archm fields (mean)
+
+
+The code will create files with ARCc grid on T07 topo
+
+2) Interpolate fields into T11:
+   ARCc0.08 T07 -> ARCc0.08 T11 32 layers
+run script isubregion_T07_T11.csh
+(output: archv_arcT11.1993_001_00.a)
+
+
+There are two possible ways to interpolate into 41-layer grid:
+(A) use archv_arcT11* -> to 41-layers
+    in this case, need to generate ("guess") the 41-layer grid
+    assuming that all new layers, above the layer 
+    where 32-l. and 41-l. grids match (see sub_adjust_vlayers.m)
+    THen do the interpolation
+
+   see remap32to41lrs_fixedZ.m & sub_adjust_vlayers.m
+
+   prepared files:
+/Net/kronos/ddmitry/hycom/ARCc0.08/archv_41layers/
+1 ddmitry coaps 3501998080 May 31 15:12 archv41lr_arcT11.1993_001_00.a
+1 ddmitry coaps      16792 May 31 15:12 archv41lr_arcT11.1993_001_00.b
+
+use this files to create restart files
+fist, create restart templates for 41-layer, T11 
+(this is needed archv -> restart conversion)
+
+(on shepard: see ARCc0.08/experiment_10.1)
+use gordon: /p/home/ddukhovs/hycom/ARCc0.08/prepare_nestGLBb0.08
+
+created files:
+/Net/kronos/ddmitry/hycom/ARCc0.08/tmp_files
+ddmitry@pegasus: /tmp_files> ll *restart*T11*
+-rw-r----- 1 ddmitry coaps 2161152564 Jun  9 10:30 cice.restart_template_T11
+-rw-r----- 1 ddmitry coaps 6874890240 Jun  9 10:36 restart.hycom_41lr_T11.template.a
+-rw-r----- 1 ddmitry coaps      30823 Jun  9 10:36 restart.hycom_41lr_T11.template.b
+
+   archv41lr_arcT11.1993_001_00.a -> restart.arc008_41lr_T11.1993_001.a
+
+
+
+====================================================================
+The following approach has not been used
+It is mentioned for information only:
+
+Approach (B):
+(B) Interpolate archv_arcT11* to fixed z-level depths 
+    (as climatology files) 
+    from climatology z-level files prepare *a, *b relax files
+    with T/S/dP fields and empty U and V
+    the 41-layer grid will be generated that corresponds T/S fields
+    in the z-level files
+    from *a, *b files: interpolate U and V into 41-layer
+    
+   So after step (2) need to do:
+
+3) Create *.a and *b z-level files
+  from ARCc T11 -> z-level ARCc T11 files
+  bin3z_arc08.com
+  Need to use my code reformat_b.F90 that 
+  reformats output *.b files such that relaxv.f would be 
+  able to read the fields, otherwise relaxvf. stumbles
+
+  The program executable is called from the script bin3z_arc08.com
+
+/Net/kronos/ddmitry/hycom/ARCc0.08/z_files/
+-rw-r--r-- 1 ddmitry coaps 887603200 Apr 12 22:17 archvARCc0.08z-001_rho.a
+-rw-r--r-- 1 ddmitry coaps      4521 Apr 13 11:46 archvARCc0.08z-001_rho.b
+-rw-r--r-- 1 ddmitry coaps 887603200 Apr 12 22:18 archvARCc0.08z-001_t.a
+-rw-r--r-- 1 ddmitry coaps      4521 Apr 13 11:47 archvARCc0.08z-001_t.b
+
+
+4) z-level ARCc T11 32 layers -> hybrid grid ARCc T11 41 layers 
+   T/S fields interpolated into
+   41 layer grid and dummy archive files
+   relax_arc08.com
+prepares files:
+/Net/kronos/ddmitry/hycom/ARCc0.08/relax_41layers/output
+-rw-r--r-- 1 ddmitry coaps 4179804160 Apr 13 11:57 archv.rlx.ARCc0.0811_1993_001.a
+-rw-r--r-- 1 ddmitry coaps      20002 Apr 13 11:57 archv.rlx.ARCc0.0811_1993_001.b
+-rw-r--r-- 1 ddmitry coaps  661667840 Apr 13 11:57 relax_int_1993_001.a
+-rw-r--r-- 1 ddmitry coaps       3557 Apr 13 11:57 relax_int_1993_001.b
+-rw-r--r-- 1 ddmitry coaps  661667840 Apr 13 11:57 relax_sal_1993_001.a
+-rw-r--r-- 1 ddmitry coaps       3557 Apr 13 11:57 relax_sal_1993_001.b
+-rw-r--r-- 1 ddmitry coaps  661667840 Apr 13 11:57 relax_tem_1993_001.a
+-rw-r--r-- 1 ddmitry coaps       3557 Apr 13 11:57 relax_tem_1993_001.b
+
+
+
+5) interpolate U,V into 41 layers
+   using Dummy archive files
+   and create final archive files

@@ -1,0 +1,221 @@
+% HYCOM Binary dayli mean files
+% Plot vertical distribution of 
+% tracer concentration (kg/m3) nat. log scale
+% and
+% plot mean vertical isopycnal layers 
+% across Baffin-Labrador-nAtl-Nordic Seas
+%
+addpath /usr/people/ddmitry/codes/MyMatlab/;
+addpath /usr/people/ddmitry/codes/MyMatlab/hycom_utils;
+addpath /usr/people/ddmitry/codes/MyMatlab/colormaps;
+addpath /usr/people/ddmitry/codes/anls_mtlb_utils/hycom_arc08;
+startup;
+
+close all
+clear
+
+s_mat=2; % =0 - extract data, no save; =1 extract & save, =2 - load saved
+s_fig=0;
+rg=9806;  % convert pressure to depth, m
+btx = 'tracer_propagation_speed.m';
+
+nTr = 1; % what tracer
+
+YRPLT=[];
+cc=0;
+iyr2=2010;
+for iyr=1993:2016
+  for im=1:12
+    cc=cc+1;
+    YRPLT(cc,1)=iyr;
+    YRPLT(cc,2)=im;
+  end
+end
+
+%YRPLT=[2008,50];
+np=size(YRPLT,1);
+
+
+regn = 'ARCc0.08';
+expt = 110;
+pthfig  = sprintf('/Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.08/%3.3i/fig_sections/',expt);
+pthtopo = '/Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.08/topo_grid/';
+pthmat  = sprintf('/Net/ocean/ddmitry/HYCOM/ARCc/ARCc0.08/%3.3i/data_mat/',expt);
+
+fmout = sprintf('%strcr_propagation_NAtl.mat',pthmat);
+
+
+fprintf('Plotting xsection for %s-%3.3i, Tracer %2.2i\n\n',regn,expt,nTr);
+
+ftopo = sprintf('%s/depth_%s_09.nc',pthtopo,regn); % 
+HH  = nc_varget(ftopo,'Bathymetry');
+LON = nc_varget(ftopo,'Longitude');
+LAT = nc_varget(ftopo,'Latitude');
+[mm,nn]=size(LON);
+
+% Specify segments of the x-section
+IJs=[    526         548
+         485         564
+         446         546
+         421         480
+         421         407
+         441         342
+         474         313
+         494         255
+         535         208
+         582         182
+         608         131
+         631          91
+         663          91
+         673         134
+         694         210
+         727         252
+         792         308
+         874         362
+         927         397
+        1003         457
+        1085         494
+        1136         553
+        1178         650
+        1206         710
+        1159         787
+        1127         853
+        1080         896 ];
+     
+nij=size(IJs,1);
+IIs=[];
+JJs=[];
+for ii=1:nij-1
+  i1=IJs(ii,1);
+  i2=IJs(ii+1,1);
+  j1=IJs(ii,2);
+  j2=IJs(ii+1,2);
+  [I,J]=sub_xsct_indx(i1,j1,i2,j2);
+  if size(I,1)==1;
+    I=I';
+    J=J';
+  end
+  
+  IIs=[IIs;I];
+  JJs=[JJs;J];
+end;
+
+IJs=[IIs,JJs];
+
+nS=length(IIs);
+clear Xl Yl
+for ii=1:nS
+  i0=IJs(ii,1);
+  j0=IJs(ii,2);
+  Xl(ii,1)=LON(j0,i0);
+  Yl(ii,1)=LAT(j0,i0);
+end;
+INDs=sub2ind(size(HH),JJs,IIs);
+
+nn=length(Xl);
+x1=Xl(1);
+y1=Yl(1);
+clear Dst
+for ii=1:nn
+  x2=Xl(ii);
+  y2=Yl(ii);
+  dXX(ii)=distance_spheric_coord(y1,x1,y2,x2)*1e-3;  % spheric distance, km
+  x1=x2;
+  y1=y2;
+  Dst(ii)=sum(dXX);
+end
+
+f_map=0;
+if f_map>0
+  figure(10); clf;
+  axis('equal');
+  hold on
+  contour(HH,[0 0],'k');
+  contour(HH,[-5000:1000:-100],'Color',[0.7 0.7 0.7]);
+  plot(IIs,JJs,'b.-');
+  for ik=1:11
+    xx=(ik-1)*1000;
+    D=abs(Dst-xx);
+    i0=find(D==min(D),1);
+    plot(IIs(i0),JJs(i0),'r.','Markersize',14);
+    stl=sprintf('%i',xx);
+    text(IIs(i0),JJs(i0),stl,'Fontsize',12);
+  end
+  
+  bottom_text(btx,'pwd',1);
+end
+
+% Get tracers, from monthly mean
+% extracted for depth layers
+if s_mat==1
+  TRC = [];
+  for ip=1:np
+    iyr=YRPLT(ip,1);
+    imo=YRPLT(ip,2);
+
+    fmat = sprintf('%strcr_dpthav_%i%2.2i.mat',pthmat,iyr,imo);
+    fprintf('Loading %s\n',fmat);
+    if exist(fmat,'file')
+      load(fmat);
+    else
+      fprintf(' =========  MISSING %s\n',fmat);
+      return
+    end
+    rr = [];
+
+    for ilv=1:3
+      fprintf('Reading: %i/%2.2i, Tracer %i, Lev %i\n',...
+	    iyr,imo,nTr,ilv);
+
+      Tr = squeeze(TRCR(ilv).TR(nTr,:,:));
+      Tr(Tr<=1e-23)=nan;
+
+      TRC(ilv,ip,:)=Tr(INDs);
+    end
+  end
+
+  if s_mat==1
+    fprintf('Saving %s\n',fmout);
+    save(fmout,'TRC');
+  end
+
+else
+  fprintf('Loading %s\n',fmout);
+  load(fmout);
+end
+
+
+xyr=[1993:1/12:2016.99];
+for ilv=1:3
+  figure(ilv); clf;
+  axes('Position',[0.09 0.4 0.85 0.53]);
+  aa=squeeze(TRC(ilv,:,:));
+  aa(aa<1e-8)=nan;
+  laa=log(aa);
+  
+  pcolor(Dst,xyr,laa); shading flat;
+  caxis([-4 1]);
+  hc=colorbar('southoutside');
+  set(hc,'Position',[0.09 0.31 0.85 0.02],...
+	 'Ticklength',0.02,'Fontsize',12);
+  
+  set(gca,'tickdir','out',...
+	  'xtick',[0:1000:11000],...
+	  'ytick',[1990:2:2018]);
+  
+  if ilv==1
+    lvl='0-50m';
+  elseif ilv==2
+    lvl='50-150m';
+  elseif ilv==3
+    lvl='0-bottom';
+  end
+  
+    
+  stl=sprintf('log(Ctr), N.Atlantic GSA Route, %s',lvl);
+  title(stl);
+  bottom_text(btx,'pwd',1,'position',[0.03 0.2 0.6 0.05]);
+  
+end
+
+  

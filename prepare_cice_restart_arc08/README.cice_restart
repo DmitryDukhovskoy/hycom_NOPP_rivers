@@ -1,0 +1,39 @@
+CICE restart is created from PIOMAS reanalysis fields:
+sea ice concentration, snow, thickness, T surface
+and CICE restart template file created by a test
+simulation sea ice started from rest (default initialization):
+expt_10.3 
+Ice state variables (thickness by categories, snow, area, enthalpie 
+of ice/snow by layers*categories) are created in remap_piomas2arc.m
+(note: a very slow code as it goes over each sea ice grid point, 
+possibly need to parallelize)
+and the rest fields are simply masked by PIOMAS sea ice mask from
+the CICE restart template (in read_cice_restart.m -> fields saved
+and used in write_cice_restart.m -> sub_restart_fields.m)
+
+To create restart:
+1) run read_cice_restart.m - read existing CICE restart file
+  to save some fields, turn flags "on":
+% Fields to save:
+FSV.ivel     = 0; % ice vel. components
+FSV.rad      = 0; % radiation fields
+FSV.ostrs    = 0; % ocean str. components
+FSV.int_strs = 0; % internal stress
+FSV.imask    = 0; % ice mask
+ 
+if cice restart does not exist - make them 0
+
+2) run remap_piomas2arc.m, recommended to make flag for multiple
+   "parallel" runs - need to run several matlab sessions
+   but they are fast, will dump multiple TMP_ files
+s_njobs = 6;  % divide all points into several jobs and run indendpently
+              % =0 or =1 - run all points in 1 time
+s_jobid = 1,...,6;  % current job id
+
+
+3) if s_njobs >1 in remap_piomas2arc.m, then need to run
+combine_piomas.m
+
+4) now can run write_cice_restart.m - make sure that
+the updated *mat files are grabbed from 
+/nexsan/people/ddmitry/hycom/ARCc0.08/103/ice_restart/
